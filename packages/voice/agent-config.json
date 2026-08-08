@@ -1,0 +1,7 @@
+{
+  "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+  "tts_model_id": "eleven_flash_v2_5",
+  "language": "en",
+  "turn": { "turn_timeout": 7, "turn_eagerness": "normal", "silence_end_call_timeout": -1 },
+  "asr": { "quality": "high", "keywords": ["FreshCase", "SaveRite"] }
+}
