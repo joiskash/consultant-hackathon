@@ -2,10 +2,11 @@ node_modules/
 dist/
 coverage/
 .env
-.env.local
+.env.*
+.git/
+.gitignore
+docs/
 *.log
 .DS_Store
 .idea/
 .vscode/
-*.tsbuildinfo
-.docker/
