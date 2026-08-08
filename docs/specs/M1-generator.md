@@ -1,6 +1,6 @@
 # M1 — Case Generator
 
-Spec for the news→CasePack pipeline. Written for a Devin session; assumes the shared `types` package (M0) exists. Target output format: a `CasePack` exactly shaped like [`fixtures/saverite.json`](../fixtures/saverite.json) — that file is the contract; when this spec and the fixture disagree, the fixture wins.
+Spec for the news→CasePack pipeline. Written for a Devin session; assumes the shared `types` package (M0) exists. Target output format: a `CasePack` exactly shaped like [`fixtures/saverite.json`](../../fixtures/saverite.json) — that file is the contract; when this spec and the fixture disagree, the fixture wins.
 
 ## Purpose
 

@@ -85,3 +85,31 @@ Configure the required repository secrets under **Settings > Secrets and variabl
 - `CONTEXT_DEV_API_KEY`
 - `ELEVENLABS_API_KEY`
 - `ANTHROPIC_API_KEY`
+
+## Platform-risk spike findings
+
+The M3 voice layer depends on three ElevenLabs Agents platform behaviours that
+must be verified before the voice layer is wired end-to-end. Run the spike
+script (`npx tsx packages/voice/scripts/spike.ts`, requires `ELEVENLABS_API_KEY`)
+plus the manual playground checks, then fill in the blanks below.
+
+> Status: **NOT YET RUN.** Fill in each result after a human runs the spike.
+
+1. **Silence-timer control** — can native no-input reprompts be disabled or
+   maxed out (so `report_silence` owns silence handling)?
+   - Result: _______________________________________________
+   - If insufficient: native reprompts must be treated as `check_in`-equivalent
+     and the team must be flagged (changes the Guided/Realistic feel).
+
+2. **Tool round-trip latency** — rough server-tool round-trip latency
+   mid-conversation (webhook tool attached to a public URL).
+   - Result: _______________________________________________
+
+3. **Transcript event availability** — are per-utterance transcript events
+   available live (client events), or only via the post-call webhook?
+   - Result: _______________________________________________
+
+Automated spike output to record (`agent_id`, `signed_url_ok`,
+`conversations_endpoint_ok`, `cleanup_ok`):
+
+- Result: _______________________________________________

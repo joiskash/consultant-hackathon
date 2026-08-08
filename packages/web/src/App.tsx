@@ -1,37 +1,31 @@
 import { useEffect, useState } from 'react';
-
-interface CaseMenuItem {
-  id: string;
-  company: string;
-  industry: string;
-  case_type: string;
-  prompt: string;
-}
+import { InterviewClient, CaseItem } from './InterviewClient';
 
 function App() {
-  const [cases, setCases] = useState<CaseMenuItem[]>([]);
+  const [cases, setCases] = useState<CaseItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const agentId = import.meta.env.VITE_AGENT_ID_REALISTIC ?? '';
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+    const apiUrl = import.meta.env.VITE_API_URL ?? '';
     fetch(`${apiUrl}/api/cases`)
       .then((res) => res.json())
-      .then((data) => setCases(data.cases ?? []))
+      .then((data) => {
+        // Menu shape is { cases: { items: [...] } } (M2) or { cases: [...] }.
+        const raw = data.cases;
+        setCases(Array.isArray(raw) ? raw : (raw?.items ?? []));
+      })
       .catch((err) => setError(err.message));
   }, []);
 
   return (
     <div className="app">
-      <h1>FreshCase</h1>
-      <p>Voice-first case interview practice</p>
-      {error && <p className="error">{error}</p>}
-      <ul>
-        {cases.map((c) => (
-          <li key={c.id}>
-            <strong>{c.company}</strong> — {c.case_type}
-          </li>
-        ))}
-      </ul>
+      <header className="header">
+        <h1 className="brand">FreshCase</h1>
+        <p className="tagline">Voice-first case interview practice — live cases from today’s headlines.</p>
+      </header>
+      {error && <p className="hint">{error}</p>}
+      <InterviewClient agentId={agentId} cases={cases} />
     </div>
   );
 }

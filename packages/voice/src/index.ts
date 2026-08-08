@@ -1,21 +1,22 @@
+import type { Mode } from '@freshcase/types';
+import { composeSystemPrompt, FIRST_MESSAGE } from './prompts';
+
+export { composeSystemPrompt, FIRST_MESSAGE } from './prompts';
+export { buildServerTools } from './tools';
+export type { WebhookTool } from './tools';
+export { buildConversationConfig, AGENT_NAME } from './config';
+export { deployAgents } from './deploy';
+
 export interface AgentConfig {
-  mode: 'guided' | 'realistic';
+  mode: Mode;
   firstMessage: string;
   systemPrompt: string;
 }
 
-export function getAgentConfig(mode: 'guided' | 'realistic'): AgentConfig {
-  const base =
-    'You are a professional case interviewer conducting a spoken case interview.';
-  const guided =
-    'Provide brief, in-the-moment course corrections when the candidate is off track. Be supportive but rigorous.';
-  const realistic =
-    'Be professionally cold. Give calibrated hints only when the candidate is stuck. Do not offer mid-case feedback.';
-
+export function getAgentConfig(mode: Mode): AgentConfig {
   return {
     mode,
-    firstMessage:
-      'Welcome to FreshCase. I have three live cases from this morning\'s headlines. Which would you like to tackle?',
-    systemPrompt: `${base} ${mode === 'guided' ? guided : realistic}`,
+    firstMessage: FIRST_MESSAGE,
+    systemPrompt: composeSystemPrompt(mode),
   };
 }

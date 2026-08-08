@@ -2,7 +2,7 @@
 
 Spec for the post-case evaluation module. Written for a Devin session; consumes M2's debrief handoff blob (transcript + event log + case pack) and produces the spoken debrief script (voiced by M3) and the written scorecard. Fully buildable against the SaveRite fixture plus a scripted transcript — no dependency on M1/M3 being live.
 
-Contract anchors: [M2 spec](M2-engine.md) event types; [`fixtures/saverite.json`](../fixtures/saverite.json) answer keys; the rubric template below (derived from the team's real mock-interview feedback form).
+Contract anchors: [M2 spec](M2-engine.md) event types; [`fixtures/saverite.json`](../../fixtures/saverite.json) answer keys; the rubric template below (derived from the team's real mock-interview feedback form).
 
 ## Purpose
 

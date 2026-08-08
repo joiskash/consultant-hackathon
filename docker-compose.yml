@@ -26,7 +26,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CONTEXT_DEV_API_KEY: ${CONTEXT_DEV_API_KEY}
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-anthropic/claude-sonnet-4.5}
       PORT: 3000
     depends_on:
       db:

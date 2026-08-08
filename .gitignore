@@ -9,3 +9,6 @@ coverage/
 .vscode/
 *.tsbuildinfo
 .docker/
+
+# Tool-specific skill mirror (canonical copy lives in .agents/skills)
+.claude/
