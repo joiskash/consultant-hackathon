@@ -26,18 +26,19 @@ function fixtures(): Map<string, CasePack> {
 const log = (msg: string) => console.log(`[generator] ${msg}`);
 const logError = (msg: string) => console.error(`[generator] ${msg}`);
 
-function teaser(pack: CasePack): string {
+function teaser(pack: CasePack, publishedHint: string | null): string {
   const type = pack.meta.case_type.replace(/_/g, ' ');
   const headline = pack.meta.source_headline;
-  return headline
-    ? `A ${type} case on ${pack.meta.company}, from this morning's news: ${headline}`
-    : `A ${type} case on ${pack.meta.company}.`;
+  if (!headline) return `A ${type} case on ${pack.meta.company}.`;
+  const today = new Date().toISOString().slice(0, 10);
+  const recency = publishedHint === today ? "this morning's news" : "this week's news";
+  return `A ${type} case on ${pack.meta.company}, from ${recency}: ${headline}`;
 }
 
 function menuItem(pack: CasePack, publishedHint: string | null): CaseMenuItem {
   return {
     id: pack.meta.id,
-    spoken_teaser: teaser(pack),
+    spoken_teaser: teaser(pack, publishedHint),
     case_type: pack.meta.case_type,
     company: pack.meta.company,
     source_published_hint: publishedHint,
@@ -64,20 +65,36 @@ export function filterToAllowlist(results: SearchResult[], domains: string[]): S
   });
 }
 
-// Stage 1 — headline pool via context.dev /web/search.
+// Below this many allowlisted fresh results, widen the search window.
+const THIN_POOL_THRESHOLD = 15;
+
+// Stage 1 — headline pool via context.dev /web/search. Prefer the last 24
+// hours (the "published this morning" demo beat); if the pool is thin, widen
+// to the last week and merge so the menu never starves on a slow news day.
 async function fetchHeadlinePool(
   client: ContextClient,
   config: GeneratorConfig,
 ): Promise<SearchResult[]> {
   const query = config.caseTriggers.search_terms.join(' OR ');
-  const results = await client.searchWeb({
-    query,
-    numResults: 30,
-    freshness: 'last_24_hours',
-    country: 'ae',
-    includeDomains: config.pressAllowlist,
-  });
-  return filterToAllowlist(results, config.pressAllowlist);
+  const search = async (freshness: 'last_24_hours' | 'last_week') =>
+    filterToAllowlist(
+      await client.searchWeb({
+        query,
+        numResults: 30,
+        freshness,
+        country: 'ae',
+        includeDomains: config.pressAllowlist,
+      }),
+      config.pressAllowlist,
+    );
+
+  const fresh = await search('last_24_hours');
+  if (fresh.length >= THIN_POOL_THRESHOLD) return fresh;
+
+  log(`thin 24h pool (${fresh.length} results) — widening to last_week`);
+  const weekly = await search('last_week');
+  const seen = new Set(fresh.map((r) => r.url));
+  return [...fresh, ...weekly.filter((r) => !seen.has(r.url))];
 }
 
 // Stage 2 — case-ability filter: heuristics first, then classification credits
