@@ -2,6 +2,8 @@ import type { Mode } from '@freshcase/types';
 import { composeSystemPrompt, FIRST_MESSAGE } from './prompts';
 
 export { composeSystemPrompt, FIRST_MESSAGE } from './prompts';
+export { buildServerTools } from './tools';
+export type { WebhookTool } from './tools';
 
 export interface AgentConfig {
   mode: Mode;
