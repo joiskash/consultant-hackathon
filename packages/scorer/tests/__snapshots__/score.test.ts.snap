@@ -1,0 +1,49 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`score() orchestration rendered scorecard matches the feedback-form layout snapshot 1`] = `
+"# Case Scorecard — SaveRite (fictional)
+
+Fixture case (fixture-saverite)
+Mode: realistic · Duration: ~7 min · Case type: profitability
+
+## Structure — Strength
+
+- **Reiterated the prompt?** — yes
+  - Evidence: metric: hints_consumed.count = 0
+
+## Quantitative — Strength
+
+- **Reiterated the prompt?** — yes
+  - Evidence: metric: hints_consumed.count = 0
+
+## Insight & Drive — Strength
+
+- **Reiterated the prompt?** — yes
+  - Evidence: metric: hints_consumed.count = 0
+
+## Closing — Strength
+
+- **Reiterated the prompt?** — yes
+  - Evidence: metric: hints_consumed.count = 0
+
+## Communication — Strength
+
+- **Reiterated the prompt?** — yes
+  - Evidence: metric: hints_consumed.count = 0
+
+## Measured metrics
+
+| Metric | Value |
+|---|---|
+| Time to framework | 115s |
+| Unannounced silence | none |
+| Announced thinking time | 90s (thinking time is good — never penalized) |
+| Talk-time ratio (candidate share) | 48% |
+| Calc elapsed | 100s |
+| Hints consumed | 0 (max level 0) |
+| Insight layers reached | 2 |
+| Math record | correct |
+
+---
+*Figures in this exercise were synthesized for practice — do not cite them as reported financials.*"
+`;
