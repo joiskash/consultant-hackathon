@@ -158,8 +158,8 @@ def test_interview_system_prompt_default_and_content():
     assert model.interview_system_prompt == BUILD_INTERVIEW_SYSTEM_PROMPT
     prompt = BUILD_INTERVIEW_SYSTEM_PROMPT.lower()
     assert "interview" in prompt
-    assert "clarifying questions" in prompt
     assert "framework" in prompt
+    assert "exactly 5" in prompt  # the builder must produce exactly 5 questions
 
 
 def test_interview_system_prompt_override():

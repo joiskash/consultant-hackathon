@@ -163,9 +163,23 @@ def test_get_context_data_happy_path(client, fake_context):
     assert body["websites_valid"] == 2
     assert body["interview"] == "## Case prompt\nBuilt interview."
     assert body["context_file"].endswith(".json")
+    assert "interview-" in body["interview_file"] and body["interview_file"].endswith(".json")
     # per-URL statuses echoed back, no full markdown in the response
     assert [w["ok"] for w in body["websites"]] == [True, False, True]
     assert body["websites"][1]["error"] == "HTTP 500"
+
+
+def test_get_context_data_persists_interview_json(client, fake_context, db_dir):
+    response = client.post("/get_context_data", json={"urls": ["https://good-a.example"]})
+
+    files = list(db_dir.glob("interview-*.json"))
+    assert len(files) == 1
+    assert str(files[0]) == response.json()["interview_file"]
+
+    saved = json.loads(files[0].read_text())
+    assert saved["interview"] == "## Case prompt\nBuilt interview."
+    assert saved["sources"] == ["https://good-a.example", "https://good-b.example"]
+    assert "generated_at" in saved and saved["model"]
 
 
 def test_get_context_data_only_valid_sites_go_to_llm(client, fake_context):
@@ -174,6 +188,24 @@ def test_get_context_data_only_valid_sites_go_to_llm(client, fake_context):
     urls_sent = [w["url"] for w in fake_context["websites"]]
     assert urls_sent == ["https://good-a.example", "https://good-b.example"]
     assert all("content" in w for w in fake_context["websites"])
+
+
+def test_trim_to_budget_caps_total_content():
+    sites = [
+        {"url": "https://a", "content": "x" * 120_000},
+        {"url": "https://b", "content": "y" * 120_000},
+    ]
+    trimmed = server.trim_to_budget(sites, max_chars=180_000)
+
+    total = sum(len(s["content"]) for s in trimmed)
+    # under budget plus the short truncation marker(s)
+    assert total <= 180_000 + 100
+    assert "[content truncated" in trimmed[-1]["content"]
+
+
+def test_trim_to_budget_keeps_small_content_untouched():
+    sites = [{"url": "https://a", "content": "short"}]
+    assert server.trim_to_budget(sites, max_chars=1000) == sites
 
 
 def test_get_context_data_writes_context_file_with_full_content(client, fake_context, db_dir):
@@ -220,3 +252,66 @@ def test_get_context_data_rejects_empty_url_list(client):
 
 def test_get_context_data_rejects_missing_field(client):
     assert client.post("/get_context_data", json={}).status_code == 422
+
+
+# --- /get_interview ------------------------------------------------------------
+
+
+def write_interview(db_dir, name, interview="## Case", sources=None):
+    db_dir.mkdir(exist_ok=True)
+    payload = {
+        "generated_at": "2026-08-08T00:00:00+00:00",
+        "model": "claude-x",
+        "sources": sources or ["https://a"],
+        "interview": interview,
+    }
+    (db_dir / name).write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_get_interview_returns_latest_by_default(client, db_dir):
+    write_interview(db_dir, "interview-20260808-090000.json", interview="OLD")
+    write_interview(db_dir, "interview-20260808-100000.json", interview="NEW")
+
+    response = client.get("/get_interview")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["interview"] == "NEW"
+    assert body["file"].endswith("interview-20260808-100000.json")
+
+
+def test_get_interview_by_name(client, db_dir):
+    write_interview(db_dir, "interview-20260808-090000.json", interview="OLD")
+    write_interview(db_dir, "interview-20260808-100000.json", interview="NEW")
+
+    response = client.get("/get_interview", params={"name": "interview-20260808-090000.json"})
+
+    assert response.status_code == 200
+    assert response.json()["interview"] == "OLD"
+
+
+def test_get_interview_404_when_none_exist(client, db_dir):
+    db_dir.mkdir(exist_ok=True)
+    response = client.get("/get_interview")
+    assert response.status_code == 404
+
+
+def test_get_interview_404_for_unknown_name(client, db_dir):
+    db_dir.mkdir(exist_ok=True)
+    response = client.get("/get_interview", params={"name": "interview-does-not-exist.json"})
+    assert response.status_code == 404
+
+
+def test_get_interview_rejects_path_traversal(client, db_dir):
+    db_dir.mkdir(exist_ok=True)
+    for bad in ["../secrets.txt", "interview-../../etc/passwd", "context-20260808-000000.json"]:
+        assert client.get("/get_interview", params={"name": bad}).status_code in (400, 404)
+
+
+def test_context_then_get_interview_roundtrip(client, fake_context, db_dir):
+    posted = client.post("/get_context_data", json={"urls": ["https://good-a.example"]})
+    got = client.get("/get_interview")
+
+    assert got.status_code == 200
+    assert got.json()["file"] == posted.json()["interview_file"]
+    assert got.json()["interview"] == "## Case prompt\nBuilt interview."
