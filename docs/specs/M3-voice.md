@@ -2,7 +2,7 @@
 
 Spec for the conversational voice layer. Written for a Devin session; assumes M2's HTTP endpoints exist (fixture-driven — M2 can be mocked with canned `PhaseBrief`s until real). **This module contains no case logic.** If you find yourself encoding case knowledge here, it belongs in M2's `PhaseBrief` or the pack.
 
-Contract anchors: [M2 spec](M2-engine.md) endpoint shapes; [`fixtures/saverite.json`](../fixtures/saverite.json) for the `*_spoken` fields the agent will voice.
+Contract anchors: [M2 spec](M2-engine.md) endpoint shapes; [`fixtures/saverite.json`](../../fixtures/saverite.json) for the `*_spoken` fields the agent will voice.
 
 ## Purpose
 

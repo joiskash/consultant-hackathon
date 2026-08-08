@@ -2,7 +2,7 @@
 
 Spec for the case state machine and session services. Written for a Devin session; assumes `types` (M0) and consumes `CasePack`s via M1's `getCasePack`. The voice layer (M3) is a thin client of this module: every behavior here is exposed through tool endpoints, and M3 contains **no case logic**.
 
-Contract anchors: [`fixtures/saverite.json`](../fixtures/saverite.json) for pack shape; [M1 spec](M1-generator.md) for menu/pack access.
+Contract anchors: [`fixtures/saverite.json`](../../fixtures/saverite.json) for pack shape; [M1 spec](M1-generator.md) for menu/pack access.
 
 ## Purpose
 
