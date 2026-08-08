@@ -11,7 +11,7 @@ import { getPool, healthCheck, migrate } from '@freshcase/db';
 const app = express();
 app.use(express.json());
 
-const fixturePath = path.join(__dirname, '../../../docs/fixtures/saverite.json');
+const fixturePath = path.join(__dirname, '../../../fixtures/saverite.json');
 const rawFixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
 export const saverite = CasePackSchema.parse(rawFixture);
 

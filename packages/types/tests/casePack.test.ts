@@ -2,7 +2,7 @@ import { CasePackSchema } from '../src/casePack';
 import fs from 'fs';
 import path from 'path';
 
-const fixturePath = path.join(__dirname, '../../../docs/fixtures/saverite.json');
+const fixturePath = path.join(__dirname, '../../../fixtures/saverite.json');
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
 
 describe('CasePack schema', () => {
