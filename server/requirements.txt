@@ -2,3 +2,6 @@ fastapi==0.141.1
 uvicorn[standard]==0.52.1
 anthropic==0.121.0
 python-dotenv==1.2.2
+
+# dev
+pytest==9.1.1

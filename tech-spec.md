@@ -12,10 +12,11 @@
 
 ```
 server/
-├── server.py          # FastAPI app, endpoints, Model instance
-├── model.py           # Model class + CALL_LLM
+├── server.py          # FastAPI app, endpoints, Model instance, DB persistence
+├── model.py           # Model class + CALL_LLM (web-search enabled)
 ├── requirements.txt   # pinned Python dependencies
 └── certs/             # local self-signed TLS certs (gitignored)
+DB/                    # research results stored as text files (contents gitignored)
 ```
 
 ## Backend architecture
@@ -23,7 +24,8 @@ server/
 `server/server.py` instantiates a single `Model` object at startup and exposes:
 
 - `GET /health` — returns `{"status": "ok", "model": <model_name>}`
-- `POST /listen` — receives user text and returns the LLM reply
+- `POST /listen` — receives a prep topic from the user, web-searches it via the
+  LLM, persists the results to `DB/`, and returns the reply plus source links
 
 ### `POST /listen`
 
@@ -31,7 +33,7 @@ Request schema (`ListenRequest`):
 
 ```json
 {
-  "text": "string — raw user input"
+  "text": "string, min 1 char — the topic the user is preparing for"
 }
 ```
 
@@ -39,12 +41,16 @@ Response schema (`ListenResponse`):
 
 ```json
 {
-  "reply": "string — LLM response text"
+  "reply": "string — LLM response text",
+  "sources": [{"url": "string", "title": "string"}],
+  "db_file": "string — path of the persisted DB text file"
 }
 ```
 
-The endpoint forwards `text` to `model.CALL_LLM({"prompt": text})` and returns
-the model's reply. LLM failures surface as `502` with the error detail.
+Flow: `text` (the topic) is wrapped in a topic-research prompt, sent to
+`model.CALL_LLM(...)`, and the result is written to
+`DB/<timestamp>-<topic-slug>.txt` (topic, date, model, reply text, and source
+list). LLM failures surface as `502` with the error detail.
 
 ## Model class
 
@@ -53,15 +59,31 @@ instance variables:
 
 | Attribute | Default | Overridable via |
 |-----------|---------|-----------------|
-| `model_name` | `claude-3-5-sonnet-20240620` | `MODEL_NAME` |
-| `system_prompt` | FreshCase coach prompt | `SYSTEM_PROMPT` |
-| `max_tokens` | `1024` | constructor arg |
+| `model_name` | `claude-sonnet-4-5-20250929` | `MODEL_NAME` |
+| `system_prompt` | `DEFAULT_SYSTEM_PROMPT` (consultant interview-prep researcher) | `SYSTEM_PROMPT` |
+| `max_tokens` | `4096` | constructor arg |
 | `api_key` | — | `ANTHROPIC_API_KEY` |
+| `enable_web_search` | `True` | constructor arg |
+| `max_search_uses` | `5` | constructor arg |
 
-`Model.CALL_LLM(context: dict) -> str` takes a prompt/context JSON payload:
+The default system prompt casts the model as a search assistant for a
+consultant preparing for case interviews: find live topic updates, case
+studies, and question banks, prioritizing reputable firms (McKinsey, BCG,
+Bain, Deloitte, KPMG, PwC, EY, …) and returning curated URL links.
+
+`Model.CALL_LLM(context: dict) -> dict` takes a prompt/context JSON payload:
 `context["prompt"]` is the user message; any other keys are serialized as
 JSON context appended to the message. The system prompt is sent via the
-Anthropic `system` parameter.
+Anthropic `system` parameter. Web search uses Anthropic's server-side
+`web_search_20250305` tool; the returned `sources` are deduplicated URLs
+collected from search results and citations.
+
+## Research store (`DB/`)
+
+Every `/listen` result is appended to the local research store as a
+human-readable text file. The directory is committed via `.gitkeep`; its
+contents are gitignored. Later, results pulled from context.dev will be
+stored here as well.
 
 ## Transport
 

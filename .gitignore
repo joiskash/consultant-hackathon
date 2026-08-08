@@ -15,3 +15,8 @@ server/.venv/
 server/certs/
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Research results store (generated text files)
+DB/*
+!DB/.gitkeep

@@ -5,35 +5,55 @@ import os
 
 from anthropic import Anthropic
 
+DEFAULT_SYSTEM_PROMPT = """You are FreshCase Research, a search assistant for a
+consultant preparing for case interviews.
+
+The user gives you a topic they are preparing for. Acting like a search engine:
+1. Use web search to find the most relevant, high-quality resources on the topic:
+   - recent industry updates, news, and reports (live topic updates),
+   - real case studies and worked case examples,
+   - practice question banks and case-interview prep resources.
+2. Prioritize reputable consulting and business sources — e.g. McKinsey, BCG,
+   Bain, Deloitte, KPMG, PwC, EY, Oliver Wyman — plus established case-prep
+   sites and business press.
+3. Return a curated list of relevant URL links, each with a one-line note on
+   what it contains and why it is useful for interview prep."""
+
 
 class Model:
     """An LLM endpoint plus its configuration.
 
     Configuration lives on the instance (model name, system prompt, token
-    limit, API key); CALL_LLM sends a prompt/context JSON payload to the LLM.
+    limit, API key, web-search settings); CALL_LLM sends a prompt/context
+    JSON payload to the LLM and returns the reply text plus source links.
     """
 
     def __init__(
         self,
-        model_name: str = "claude-3-5-sonnet-20240620",
-        system_prompt: str = (
-            "You are FreshCase, an expert case-interview coach. "
-            "Respond concisely and concretely."
-        ),
-        max_tokens: int = 1024,
+        model_name: str = "claude-sonnet-4-5-20250929",
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        max_tokens: int = 4096,
         api_key: str | None = None,
+        enable_web_search: bool = True,
+        max_search_uses: int = 5,
     ) -> None:
         self.model_name = model_name
         self.system_prompt = system_prompt
         self.max_tokens = max_tokens
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self.enable_web_search = enable_web_search
+        self.max_search_uses = max_search_uses
         self._client = Anthropic(api_key=self.api_key) if self.api_key else None
 
-    def CALL_LLM(self, context: dict) -> str:
-        """Call the LLM with a prompt/context JSON payload and return text.
+    def CALL_LLM(self, context: dict) -> dict:
+        """Call the LLM with a prompt/context JSON payload.
 
         `context` must contain a "prompt" key with the user's text. Any
         additional keys are forwarded to the model as JSON context.
+
+        Returns {"text": str, "sources": [{"url": str, "title": str}]}.
+        With web search enabled, sources are deduplicated links collected
+        from the model's search results and citations.
         """
         if self._client is None:
             raise RuntimeError("ANTHROPIC_API_KEY is not configured")
@@ -44,10 +64,36 @@ class Model:
         if extras:
             user_message += f"\n\nContext:\n{json.dumps(extras, indent=2)}"
 
-        response = self._client.messages.create(
-            model=self.model_name,
-            max_tokens=self.max_tokens,
-            system=self.system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-        return response.content[0].text
+        kwargs = {
+            "model": self.model_name,
+            "max_tokens": self.max_tokens,
+            "system": self.system_prompt,
+            "messages": [{"role": "user", "content": user_message}],
+        }
+        if self.enable_web_search:
+            kwargs["tools"] = [
+                {
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": self.max_search_uses,
+                }
+            ]
+
+        response = self._client.messages.create(**kwargs)
+
+        texts, sources, seen = [], [], set()
+        for block in response.content:
+            if block.type == "text":
+                texts.append(block.text)
+                candidates = getattr(block, "citations", None) or []
+            elif block.type == "web_search_tool_result":
+                candidates = getattr(block, "content", None) or []
+            else:
+                continue
+            for item in candidates:
+                url = getattr(item, "url", None)
+                if url and url not in seen:
+                    seen.add(url)
+                    sources.append({"url": url, "title": getattr(item, "title", "") or ""})
+
+        return {"text": "\n".join(texts), "sources": sources}
