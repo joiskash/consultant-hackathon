@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from model import DEFAULT_SYSTEM_PROMPT, Model
+from model import BUILD_INTERVIEW_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT, Model
 
 
 def text_block(text, citations=None):
@@ -151,3 +151,48 @@ def test_blocks_without_urls_are_ignored():
     )
     out = model.CALL_LLM({"prompt": "topic"})
     assert out == {"text": "body", "sources": []}
+
+
+def test_interview_system_prompt_default_and_content():
+    model = Model(api_key="test-key")
+    assert model.interview_system_prompt == BUILD_INTERVIEW_SYSTEM_PROMPT
+    prompt = BUILD_INTERVIEW_SYSTEM_PROMPT.lower()
+    assert "interview" in prompt
+    assert "clarifying questions" in prompt
+    assert "framework" in prompt
+
+
+def test_interview_system_prompt_override():
+    model = Model(api_key="test-key", interview_system_prompt="custom interview prompt")
+    assert model.interview_system_prompt == "custom interview prompt"
+
+
+def test_build_interview_without_api_key_raises(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY is not configured"):
+        Model().build_interview([{"url": "https://x", "content": "c"}])
+
+
+def test_build_interview_uses_interview_prompt_no_web_search():
+    model, messages = make_model([text_block("## Case prompt\n...")])
+    out = model.build_interview([{"url": "https://x", "content": "Revenue fell 20%."}])
+
+    assert messages.kwargs["system"] == model.interview_system_prompt
+    assert messages.kwargs["model"] == model.model_name
+    assert "tools" not in messages.kwargs  # no web search when building
+    assert out == {"interview": "## Case prompt\n..."}
+
+
+def test_build_interview_passes_website_content_as_json():
+    model, messages = make_model([text_block("interview")])
+    websites = [{"url": "https://a", "content": "Alpha"}, {"url": "https://b", "content": "Beta"}]
+    model.build_interview(websites)
+
+    content = messages.kwargs["messages"][0]["content"]
+    assert "https://a" in content and "Alpha" in content
+    assert "https://b" in content and "Beta" in content
+
+
+def test_build_interview_joins_multiple_text_blocks():
+    model, _ = make_model([text_block("part one\n"), text_block("part two")])
+    assert model.build_interview([])["interview"] == "part one\npart two"

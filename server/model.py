@@ -19,6 +19,26 @@ The user gives you a topic they are preparing for. Acting like a search engine:
 3. Return a curated list of relevant URL links, each with a one-line note on
    what it contains and why it is useful for interview prep."""
 
+BUILD_INTERVIEW_SYSTEM_PROMPT = """You are FreshCase Interviewer, a case-interview
+designer.
+
+You are given research content scraped from one or more websites (as JSON, one
+entry per site with its URL and page content). Using ONLY this content, design a
+consulting-style case interview for a candidate preparing on this topic.
+
+Produce, clearly sectioned:
+1. Case prompt — client, situation, and the explicit ask (2-4 sentences).
+2. Clarifying questions the candidate might ask, each with a model answer
+   grounded in the provided content.
+3. A recommended framework / structure for cracking the case.
+4. A quantitative question with realistic numbers drawn from the content, plus a
+   worked answer key.
+5. 3-5 probing follow-up questions.
+6. The overall interview flow, step by step, from opening to recommendation.
+
+Ground every fact and figure in the supplied website content; do not invent
+numbers that contradict it."""
+
 
 class Model:
     """An LLM endpoint plus its configuration.
@@ -32,6 +52,7 @@ class Model:
         self,
         model_name: str = "claude-sonnet-4-5-20250929",
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        interview_system_prompt: str = BUILD_INTERVIEW_SYSTEM_PROMPT,
         max_tokens: int = 4096,
         api_key: str | None = None,
         enable_web_search: bool = True,
@@ -39,6 +60,7 @@ class Model:
     ) -> None:
         self.model_name = model_name
         self.system_prompt = system_prompt
+        self.interview_system_prompt = interview_system_prompt
         self.max_tokens = max_tokens
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         self.enable_web_search = enable_web_search
@@ -97,3 +119,33 @@ class Model:
                     sources.append({"url": url, "title": getattr(item, "title", "") or ""})
 
         return {"text": "\n".join(texts), "sources": sources}
+
+    def build_interview(self, websites: list[dict]) -> dict:
+        """Build a case interview from scraped website content.
+
+        `websites` is a list of per-site dicts (e.g. {"url", "markdown"}) that
+        already passed validation. The content is passed as JSON context and the
+        model synthesizes questions and an interview flow from it — no web search.
+
+        Returns {"interview": str}.
+        """
+        if self._client is None:
+            raise RuntimeError("ANTHROPIC_API_KEY is not configured")
+
+        payload = json.dumps(websites, indent=2)
+        response = self._client.messages.create(
+            model=self.model_name,
+            max_tokens=self.max_tokens,
+            system=self.interview_system_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Research content scraped from the websites (JSON):\n"
+                        f"{payload}\n\nDesign the case interview."
+                    ),
+                }
+            ],
+        )
+        text = "".join(b.text for b in response.content if b.type == "text")
+        return {"interview": text}

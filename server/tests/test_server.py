@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -112,3 +114,109 @@ def test_listen_returns_502_when_llm_fails(client, monkeypatch, db_dir):
     assert response.status_code == 502
     assert response.json()["detail"] == "ANTHROPIC_API_KEY is not configured"
     assert not db_dir.exists() or not list(db_dir.glob("*.txt"))
+
+
+# --- /get_context_data ---------------------------------------------------------
+
+
+def record(url, ok=True, markdown="# Data", error=None):
+    return {
+        "url": url,
+        "ok": ok,
+        "markdown": markdown if ok else None,
+        "content_length": len(markdown) if ok else None,
+        "error": error,
+    }
+
+
+@pytest.fixture
+def fake_context(monkeypatch):
+    """Stub fetch_context and build_interview; capture what they receive."""
+    calls = {"urls": None, "websites": None}
+
+    def fake_fetch(urls, *args, **kwargs):
+        calls["urls"] = urls
+        return [
+            record("https://good-a.example"),
+            record("https://bad.example", ok=False, error="HTTP 500"),
+            record("https://good-b.example", markdown="# More data"),
+        ]
+
+    def fake_build(websites):
+        calls["websites"] = websites
+        return {"interview": "## Case prompt\nBuilt interview."}
+
+    monkeypatch.setattr(server, "fetch_context", fake_fetch)
+    monkeypatch.setattr(server.model, "build_interview", fake_build)
+    return calls
+
+
+def test_get_context_data_happy_path(client, fake_context):
+    response = client.post(
+        "/get_context_data",
+        json={"urls": ["https://good-a.example", "https://bad.example", "https://good-b.example"]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["websites_fetched"] == 3
+    assert body["websites_valid"] == 2
+    assert body["interview"] == "## Case prompt\nBuilt interview."
+    assert body["context_file"].endswith(".json")
+    # per-URL statuses echoed back, no full markdown in the response
+    assert [w["ok"] for w in body["websites"]] == [True, False, True]
+    assert body["websites"][1]["error"] == "HTTP 500"
+
+
+def test_get_context_data_only_valid_sites_go_to_llm(client, fake_context):
+    client.post("/get_context_data", json={"urls": ["https://good-a.example"]})
+
+    urls_sent = [w["url"] for w in fake_context["websites"]]
+    assert urls_sent == ["https://good-a.example", "https://good-b.example"]
+    assert all("content" in w for w in fake_context["websites"])
+
+
+def test_get_context_data_writes_context_file_with_full_content(client, fake_context, db_dir):
+    response = client.post("/get_context_data", json={"urls": ["https://good-a.example"]})
+
+    files = list(db_dir.glob("context-*.json"))
+    assert len(files) == 1
+    assert str(files[0]) == response.json()["context_file"]
+
+    saved = json.loads(files[0].read_text())
+    assert "fetched_at" in saved
+    assert len(saved["results"]) == 3  # all results persisted, including the failed one
+    assert saved["results"][0]["markdown"] == "# Data"
+
+
+def test_get_context_data_502_when_no_valid_sites(client, monkeypatch, db_dir):
+    monkeypatch.setattr(server, "fetch_context", lambda urls: [record("https://x", ok=False, error="404")])
+    build_called = []
+    monkeypatch.setattr(server.model, "build_interview", lambda w: build_called.append(w))
+
+    response = client.post("/get_context_data", json={"urls": ["https://x"]})
+
+    assert response.status_code == 502
+    assert "no valid website data" in response.json()["detail"]
+    assert not build_called  # LLM never invoked
+    # raw results are still persisted for debugging
+    assert list(db_dir.glob("context-*.json"))
+
+
+def test_get_context_data_500_when_key_missing(client, monkeypatch):
+    def no_key(urls):
+        raise RuntimeError("CONTEXT_DEV_API_KEY is not configured")
+
+    monkeypatch.setattr(server, "fetch_context", no_key)
+    response = client.post("/get_context_data", json={"urls": ["https://x"]})
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "CONTEXT_DEV_API_KEY is not configured"
+
+
+def test_get_context_data_rejects_empty_url_list(client):
+    assert client.post("/get_context_data", json={"urls": []}).status_code == 422
+
+
+def test_get_context_data_rejects_missing_field(client):
+    assert client.post("/get_context_data", json={}).status_code == 422

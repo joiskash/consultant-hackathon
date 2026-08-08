@@ -9,6 +9,7 @@ services:
     # Left unset (rather than empty) when absent, so server.py defaults apply.
     environment:
       - ANTHROPIC_API_KEY
+      - CONTEXT_DEV_API_KEY
       - MODEL_NAME
       - SYSTEM_PROMPT
     volumes:
