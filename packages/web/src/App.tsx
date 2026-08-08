@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InterviewClient } from './InterviewClient';
 
 interface CaseMenuItem {
   id: string;
@@ -11,6 +12,7 @@ interface CaseMenuItem {
 function App() {
   const [cases, setCases] = useState<CaseMenuItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const agentId = import.meta.env.VITE_AGENT_ID_REALISTIC ?? '';
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -32,6 +34,7 @@ function App() {
           </li>
         ))}
       </ul>
+      <InterviewClient agentId={agentId} />
     </div>
   );
 }
