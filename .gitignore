@@ -9,3 +9,9 @@ coverage/
 .vscode/
 *.tsbuildinfo
 .docker/
+
+# Python backend
+server/.venv/
+server/certs/
+__pycache__/
+*.pyc

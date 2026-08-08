@@ -1,76 +1,88 @@
-# FreshCase — Technical Specification
+# FreshCase — Technical Specification (v1)
 
 ## Stack
 
-- **Runtime:** Node.js 20
-- **Language:** TypeScript 5.5
-- **Package manager:** npm workspaces
-- **Web framework:** React 18 + Vite 5
-- **Backend:** Express 4
-- **Database:** PostgreSQL 16, accessed via `pg`
-- **Validation / types:** Zod
-- **Testing:** Jest + ts-jest, Supertest for API tests
-- **Containers:** Docker, Docker Compose
-- **CI/CD:** GitHub Actions
+- **Language:** Python 3.12
+- **Web framework:** FastAPI (+ Pydantic v2 for schemas)
+- **Server:** Uvicorn (HTTP/HTTPS)
+- **LLM:** Anthropic Messages API via the `anthropic` SDK
+- **Config:** environment variables via `python-dotenv`
 
-## Monorepo layout
+## Layout
 
-The repo uses npm workspaces. Each package under `packages/` is versioned independently but built in dependency order at the root.
-
-| Package | Responsibility | Depends on |
-|---------|----------------|------------|
-| `packages/types` | Shared Zod schemas, TypeScript types, and the central `callClaude` LLM helper | — |
-| `packages/db` | Postgres connection, migrations | — |
-| `packages/generator` | News story intake and case-pack generation stubs | `types` |
-| `packages/engine` | Express HTTP API, session state machine, live-fetch and secret wrappers | `types`, `db` |
-| `packages/voice` | ElevenLabs agent configuration stubs | `types` |
-| `packages/scorer` | Rubric scoring and voice-metric stubs | `types` |
-| `packages/web` | React + Vite frontend | — |
+```
+server/
+├── server.py          # FastAPI app, endpoints, Model instance
+├── model.py           # Model class + CALL_LLM
+├── requirements.txt   # pinned Python dependencies
+└── certs/             # local self-signed TLS certs (gitignored)
+```
 
 ## Backend architecture
 
-`packages/engine/src/index.ts` exposes:
+`server/server.py` instantiates a single `Model` object at startup and exposes:
 
-- `GET /health` — returns `ok` if Postgres is reachable, otherwise `degraded`
-- `GET /api/cases` — returns the current case menu (currently the committed SaveRite fixture)
-- `POST /api/sessions` — creates an interview session in the database
-- `GET /api/sessions/:id` — fetches a session by UUID
+- `GET /health` — returns `{"status": "ok", "model": <model_name>}`
+- `POST /listen` — receives user text and returns the LLM reply
 
-The engine loads environment variables via `dotenv` from the repo root and never logs API keys.
+### `POST /listen`
 
-## Database
+Request schema (`ListenRequest`):
 
-`packages/db/migrations/001_init.sql` bootstraps a `sessions` table with a UUID primary key, timestamps, mode, case-pack reference, and phase.
+```json
+{
+  "text": "string — raw user input"
+}
+```
 
-The engine runs `migrate()` on startup and before database-dependent endpoints.
+Response schema (`ListenResponse`):
 
-## Web application
+```json
+{
+  "reply": "string — LLM response text"
+}
+```
 
-`packages/web` is a minimal React + Vite app that fetches and displays the case menu from `GET /api/cases`. It reads the backend URL from the `VITE_API_URL` environment variable.
+The endpoint forwards `text` to `model.CALL_LLM({"prompt": text})` and returns
+the model's reply. LLM failures surface as `502` with the error detail.
 
-## External APIs and secret handling
+## Model class
 
-- `CONTEXT_DEV_API_KEY` — required by `packages/engine/src/services/contextDev.ts`
-- `ELEVENLABS_API_KEY` — required by `packages/engine/src/services/elevenlabs.ts`
-- `ANTHROPIC_API_KEY` — required by `packages/types/src/llm.ts` (`callClaude`)
+`server/model.py` defines `Model`, which holds the LLM configuration as
+instance variables:
 
-All keys are read from environment variables. `.env` is gitignored; `.env.example` documents the expected variables. CI receives the same values from GitHub repository secrets.
+| Attribute | Default | Overridable via |
+|-----------|---------|-----------------|
+| `model_name` | `claude-3-5-sonnet-20240620` | `MODEL_NAME` |
+| `system_prompt` | FreshCase coach prompt | `SYSTEM_PROMPT` |
+| `max_tokens` | `1024` | constructor arg |
+| `api_key` | — | `ANTHROPIC_API_KEY` |
 
-## CI/CD
+`Model.CALL_LLM(context: dict) -> str` takes a prompt/context JSON payload:
+`context["prompt"]` is the user message; any other keys are serialized as
+JSON context appended to the message. The system prompt is sent via the
+Anthropic `system` parameter.
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
+## Transport
 
-1. Check out the repo
-2. Set up Node.js 20 from `.nvmrc` and cache `npm`
-3. Install workspace dependencies
-4. Build all packages in dependency order
-5. Run unit tests with coverage and upload the reports
-6. Run integration tests against a Postgres service container
-7. Build the Docker images defined in `packages/engine/Dockerfile` and `packages/web/Dockerfile`
+- Local development runs on port `8000` (env `PORT`).
+- **HTTPS:** set `SSL_KEYFILE` and `SSL_CERTFILE` to run Uvicorn with TLS.
+  Self-signed certs for local testing live in `server/certs/` (regenerate with
+  `openssl req -x509 -newkey rsa:2048 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes -subj "/CN=localhost"`).
+  In production, TLS is terminated at the reverse proxy / load balancer.
 
-## Testing strategy
+## Secrets
 
-- **Unit tests:** each package has its own Jest suite. `packages/types` validates the SaveRite fixture against the `CasePack` Zod schema and asserts that missing `brainstorm_module` fails.
-- **API tests:** `packages/engine` uses Supertest to test `/health`, `/api/cases`, and secret guards.
-- **Integration tests:** `packages/engine/tests/integration/sessions.test.ts` creates and fetches a real session against a Postgres database when `DATABASE_URL` is set.
-- **Coverage:** Jest's built-in `--coverage` flag produces `coverage/` directories for the packages that run Jest.
+- `ANTHROPIC_API_KEY` — required for `CALL_LLM`; read from the environment
+  (`.env` is gitignored). Never logged or exposed to clients.
+
+## Running locally
+
+```bash
+cd server
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python server.py                     # HTTP on :8000
+# or with TLS:
+SSL_KEYFILE=certs/key.pem SSL_CERTFILE=certs/cert.pem python server.py
+```
