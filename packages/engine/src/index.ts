@@ -7,9 +7,11 @@ import express from 'express';
 import fs from 'fs';
 import { CasePackSchema } from '@freshcase/types';
 import { getPool, healthCheck, migrate } from '@freshcase/db';
+import { mockEngineRouter } from './mockEngine';
 
 const app = express();
 app.use(express.json());
+app.use(mockEngineRouter());
 
 const fixturePath = path.join(__dirname, '../../../docs/fixtures/saverite.json');
 const rawFixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
