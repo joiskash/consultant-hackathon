@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: npm install --workspaces
       - name: Build all packages
-        run: npm run build --workspaces
+        run: npm run build
       - name: Run unit tests with coverage
         run: npm run test:coverage --workspaces
       - name: Run integration tests
