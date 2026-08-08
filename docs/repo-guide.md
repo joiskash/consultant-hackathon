@@ -3,13 +3,13 @@
 A file-by-file map of the repo: what every folder and file is, and what the code
 inside it does.
 
-> **State of the repo (branch `entry-point-l1`).** There are two codebases here:
+> **State of the repo.** There are two codebases here:
 >
 > 1. **`server/` + `DB/` — the active v1 backend.** Python / FastAPI. This is what
->    currently runs and what new work builds on.
-> 2. **`packages/` — the original TypeScript monorepo scaffold.** Express + React +
->    Postgres, built as the M0–M5 hackathon scaffold. Still in the repo and still
->    wired to CI and Docker Compose, but the v1 flow does not use it.
+>    CI, Docker Compose and all new work target.
+> 2. **`archive/` — the original TypeScript monorepo scaffold.** Express + React +
+>    Postgres, built as the M0–M5 hackathon scaffold. Retained for reference only:
+>    it is no longer built, run, or tested.
 >
 > Both are documented below, clearly labelled.
 
@@ -36,7 +36,7 @@ consultant-hackathon/
 │       ├── M3-voice.md
 │       ├── M4-scorer.md
 │       └── M5-glue-demo.md
-├── packages/                        # [legacy] TypeScript monorepo (npm workspaces)
+├── archive/                         # [legacy] TypeScript monorepo, no longer built/run
 │   ├── db/
 │   │   ├── migrations/001_init.sql
 │   │   ├── src/index.ts
@@ -70,6 +70,7 @@ consultant-hackathon/
 │   ├── model.py                     #      Model class + CALL_LLM
 │   ├── server.py                    #      FastAPI app, /listen, DB persistence
 │   ├── conftest.py                  #      pytest path setup
+│   ├── Dockerfile                   #      image built by docker-compose
 │   ├── requirements.txt             #      pinned Python deps
 │   ├── static/
 │   │   └── index.html               #      frontend (topic box + results)
@@ -78,13 +79,11 @@ consultant-hackathon/
 │   │   └── test_server.py           #      9 tests for endpoints + persistence
 │   ├── certs/                       #      local TLS certs (gitignored)
 │   └── .venv/                       #      virtualenv (gitignored)
-├── .github/workflows/ci.yml         # CI (Node/TS only, today)
-├── docker-compose.yml               # Postgres + TS backend + TS web
+├── .github/workflows/ci.yml         # CI: pytest + docker build (Python only)
+├── docker-compose.yml               # single `server` service on :8000
 ├── .env.example                     # secret template
 ├── .dockerignore
 ├── .gitignore
-├── .nvmrc                           # Node 20
-├── package.json / package-lock.json # npm workspace root
 ├── README.md
 └── tech-spec.md                     # v1 technical spec
 ```
@@ -214,13 +213,13 @@ here too.
 
 ---
 
-## Part 2 — The legacy TypeScript scaffold (`packages/`)
+## Part 2 — The legacy TypeScript scaffold (`archive/`)
 
 An npm-workspaces monorepo. Root `package.json` builds the packages in
 dependency order (`types` → `db` → `generator`/`scorer`/`voice` → `engine` →
 `web`). None of it is used by the v1 Python flow.
 
-### `packages/types` — shared contracts
+### `archive/packages/types` — shared contracts
 
 - **`src/casePack.ts`** — the central Zod schema for a case. `CasePackSchema`
   composes `meta` (attribution, source URLs, company, industry, case type,
@@ -236,7 +235,7 @@ dependency order (`types` → `db` → `generator`/`scorer`/`voice` → `engine`
 - **`tests/`** — validates the SaveRite fixture against the schema (and that a
   missing `brainstorm_module` fails), plus `callClaude` guards.
 
-### `packages/db` — Postgres access
+### `archive/packages/db` — Postgres access
 
 - **`src/index.ts`** — `getPool()` (throws if `DATABASE_URL` is unset),
   `migrate(pool)` (executes the SQL file), `healthCheck(pool)` (`SELECT 1`).
@@ -244,7 +243,7 @@ dependency order (`types` → `db` → `generator`/`scorer`/`voice` → `engine`
   table: UUID PK, created/updated timestamps, `mode`, `case_pack_id`, and a
   `phase` defaulting to `'menu'`.
 
-### `packages/engine` — the Express API
+### `archive/packages/engine` — the Express API
 
 - **`src/index.ts`** — loads `.env` from the repo root, parses the SaveRite
   fixture through `CasePackSchema` at startup, and exposes `GET /health`
@@ -258,7 +257,7 @@ dependency order (`types` → `db` → `generator`/`scorer`/`voice` → `engine`
   integration test that creates and fetches a real session when `DATABASE_URL`
   is set (separate `jest.integration.js` config).
 
-### `packages/generator`, `packages/scorer`, `packages/voice` — stubs
+### `archive/packages/generator`, `archive/packages/scorer`, `archive/packages/voice` — stubs
 
 - **generator** — `scoreCaseability(input)` is implemented as a trivial
   heuristic (+1 for a headline, +1 for a source URL, with reasons);
@@ -269,7 +268,7 @@ dependency order (`types` → `db` → `generator`/`scorer`/`voice` → `engine`
   `guided` (supportive, in-the-moment corrections) vs `realistic`
   (professionally cold, hints only when stuck), sharing one welcome message.
 
-### `packages/web` — the React frontend
+### `archive/packages/web` — the React frontend
 
 `src/App.tsx` fetches `GET /api/cases` from `VITE_API_URL` (default
 `http://localhost:3000`) and lists company + case type, with basic error state.
@@ -283,16 +282,16 @@ Vite plumbing. **Note:** this is the *old* frontend — the v1 UI is
 
 | File | What it does |
 |------|--------------|
-| `README.md` | Project overview and quick start (describes the TS stack) |
+| `README.md` | Project overview and quick start for the Python/FastAPI backend |
 | `tech-spec.md` | **v1 spec** — the Python/FastAPI backend, `/listen`, `Model`, `DB/`, TLS |
-| `package.json` | npm workspace root; `build`/`test`/`integration`/`dev` scripts |
-| `package-lock.json` | Locked JS dependency tree |
-| `.nvmrc` | Pins Node 20 |
-| `.env.example` | Template: `DATABASE_URL`, `ANTHROPIC_API_KEY`, `CONTEXT_DEV_API_KEY`, `ELEVENLABS_API_KEY`, `PORT` |
-| `.gitignore` | Node artifacts, `.env`, plus Python entries (`server/.venv/`, `server/certs/`, `__pycache__/`) and `DB/*` except `.gitkeep` |
-| `.dockerignore` | Keeps `node_modules`, build output and secrets out of images |
-| `docker-compose.yml` | Postgres 16 (with healthcheck + auto-run migrations) + the TS backend on :3000 + the TS web app on :5173. **Does not yet include the Python server.** |
-| `.github/workflows/ci.yml` | On push/PR to `main`: install, build, Jest with coverage, integration tests against a Postgres service, Docker builds. **Node only — the Python tests are not in CI yet.** |
+| `.env.example` | Template: `ANTHROPIC_API_KEY`, plus optional `MODEL_NAME`, `SYSTEM_PROMPT`, `PORT`, TLS paths |
+| `.gitignore` | `.env`, Python artifacts (`server/.venv/`, `server/certs/`, `__pycache__/`, `.pytest_cache/`), `DB/*` except `.gitkeep`, and leftover Node artifacts |
+| `.dockerignore` | Keeps `archive/`, `DB/`, the virtualenv, certs and secrets out of the image |
+| `docker-compose.yml` | One `server` service built from `server/Dockerfile` on :8000, with `./DB` bind-mounted for persistence |
+| `.github/workflows/ci.yml` | On push/PR to `main`: `test` job (Python 3.12 + `pytest tests/`) and `docker` job (`docker compose build`) |
+
+The npm workspace config (`package.json`, `package-lock.json`, `.nvmrc`) moved
+into `archive/` along with the TypeScript sources; no root config references it.
 
 ### `docs/`
 
@@ -314,10 +313,10 @@ Vite plumbing. **Note:** this is the *old* frontend — the v1 UI is
 
 ## Known gaps
 
-- The Python tests aren't in CI, and `docker-compose.yml` doesn't build the
-  Python server — both still point only at the TS scaffold.
-- `README.md` still describes the TypeScript stack as the backend.
 - `/listen` has no end-to-end verification against the real Anthropic API yet
   (needs `ANTHROPIC_API_KEY` in `.env`); everything else is covered by the
   22 mocked tests.
 - context.dev ingestion into `DB/` is planned but not implemented.
+- The archived TypeScript code is preserved but unmaintained. Its npm workspace
+  root now lives at `archive/package.json`, so building it would mean running
+  npm from inside `archive/`.
