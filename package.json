@@ -16,6 +16,9 @@
     "integration": "npm run build -w packages/types -w packages/db -w packages/engine && npm run integration --workspace=packages/engine",
     "dev": "docker compose up --build"
   },
+  "overrides": {
+    "livekit-client": "2.16.1"
+  },
   "devDependencies": {
     "typescript": "^5.5.4"
   }
