@@ -45,23 +45,36 @@ export class ContextClient {
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
-  // 408 = cold cache: retry once ("the second hit is warm"). 429: respect Retry-After.
-  private async request(url: string, init: RequestInit, retried = false): Promise<Response> {
-    const response = await this.fetchImpl(url, {
-      ...init,
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        'content-type': 'application/json',
-        ...(init.headers ?? {}),
-      },
-    });
-    if (response.status === 408 && !retried) {
-      return this.request(url, init, true);
+  // 408 = cold cache: retry ("the second hit is warm"). 429: respect Retry-After.
+  // Also retry transient network failures (flaky DNS/egress surfaces as
+  // `TypeError: fetch failed` with EAI_AGAIN / ECONNRESET / connect timeout),
+  // which otherwise drop every grounded story and force the fixture fallback.
+  private async request(url: string, init: RequestInit, attempt = 0): Promise<Response> {
+    const MAX_ATTEMPTS = 5;
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        ...init,
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          'content-type': 'application/json',
+          ...(init.headers ?? {}),
+        },
+      });
+    } catch (err) {
+      if (attempt + 1 < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        return this.request(url, init, attempt + 1);
+      }
+      throw err;
     }
-    if (response.status === 429 && !retried) {
+    if (response.status === 408 && attempt + 1 < MAX_ATTEMPTS) {
+      return this.request(url, init, attempt + 1);
+    }
+    if (response.status === 429 && attempt + 1 < MAX_ATTEMPTS) {
       const retryAfter = Number(response.headers.get('retry-after') ?? '2');
       await new Promise((r) => setTimeout(r, Math.min(retryAfter, 30) * 1000));
-      return this.request(url, init, true);
+      return this.request(url, init, attempt + 1);
     }
     return response;
   }
