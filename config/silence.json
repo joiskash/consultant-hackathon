@@ -1,0 +1,22 @@
+{
+  "announced_thinking_seconds": 90,
+  "unannounced_tolerance_seconds": { "dialogue": 10, "work": 30 },
+  "phase_categories": {
+    "menu": "dialogue",
+    "prompt": "dialogue",
+    "clarifying": "dialogue",
+    "structure": "work",
+    "quant": "work",
+    "brainstorm": "dialogue",
+    "recommendation": "dialogue",
+    "debrief": "dialogue"
+  },
+  "soft_phase_budget_minutes": {
+    "prompt": 2,
+    "clarifying": 1.5,
+    "structure": 2,
+    "quant": 2.5,
+    "brainstorm": 1.5,
+    "recommendation": 1.5
+  }
+}

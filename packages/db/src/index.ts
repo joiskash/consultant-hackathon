@@ -11,9 +11,10 @@ export function getPool(): Pool {
 }
 
 export async function migrate(pool: Pool): Promise<void> {
-  const filePath = path.join(__dirname, '../migrations/001_init.sql');
-  const sql = fs.readFileSync(filePath, 'utf-8');
-  await pool.query(sql);
+  const dir = path.join(__dirname, '../migrations');
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+    await pool.query(fs.readFileSync(path.join(dir, file), 'utf-8'));
+  }
 }
 
 export async function healthCheck(pool: Pool): Promise<void> {
