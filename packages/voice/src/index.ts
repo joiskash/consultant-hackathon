@@ -5,6 +5,7 @@ export { composeSystemPrompt, FIRST_MESSAGE } from './prompts';
 export { buildServerTools } from './tools';
 export type { WebhookTool } from './tools';
 export { buildConversationConfig, AGENT_NAME } from './config';
+export { deployAgents } from './deploy';
 
 export interface AgentConfig {
   mode: Mode;
