@@ -29,6 +29,56 @@ docker compose up --build
 
 The web app is exposed on `http://localhost:5173`. Under Docker Compose the backend is not published to the host — the web app proxies `/api` and `/session` requests to the `backend` service internally (see `packages/web/vite.config.ts`).
 
+## Running the voice demo locally
+
+`docker compose up --build` boots the full stack, but a **live voice interview** has one extra requirement: during a call the ElevenLabs agent invokes the engine's server tools (`/session`, `/session/:id/*`) as **outbound webhooks**, so the engine must be reachable at a **public URL**. In local dev that means tunnelling with [ngrok](https://ngrok.com/).
+
+The data flow:
+
+```
+browser ──/api, /session──▶ engine            (via the Vite proxy)   # menu + signed URL
+browser ──WebSocket───────▶ ElevenLabs         (via signed URL)       # audio
+ElevenLabs ──webhooks─────▶ ngrok ──▶ engine                          # server tools, mid-call
+```
+
+1. **Start Postgres and build the packages**
+
+   ```bash
+   docker compose up -d db      # or point DATABASE_URL at any Postgres
+   npm run build
+   ```
+
+2. **Run the engine on port 3100** (the port the Vite dev proxy targets by default)
+
+   ```bash
+   PORT=3100 npm run dev -w packages/engine
+   ```
+
+3. **Expose the engine publicly with ngrok**
+
+   ```bash
+   ngrok http 3100
+   ```
+
+   Copy the printed `https://….ngrok-free.app` URL.
+
+4. **Deploy the ElevenLabs agents** pointing at that public URL. This creates or updates the `guided` and `realistic` agents and prints their ids (requires `ELEVENLABS_API_KEY`):
+
+   ```bash
+   BACKEND_PUBLIC_URL=https://….ngrok-free.app node packages/voice/dist/deploy.js
+   # → { "guided": "agent_…", "realistic": "agent_…" }
+   ```
+
+5. **Run the web app** with the realistic agent id (the UI currently connects to the realistic agent)
+
+   ```bash
+   VITE_AGENT_ID_REALISTIC=agent_… npm run dev -w packages/web
+   ```
+
+   Open `http://localhost:5173`, allow the microphone, and click **Start voice interview**.
+
+Re-run step 4 whenever the ngrok URL changes — the free tier issues a new URL on each restart, and stale webhook URLs leave the agent unable to reach the engine mid-call.
+
 ## Repository layout
 
 ```
@@ -68,9 +118,15 @@ Copy `.env.example` to `.env` and fill in the real values. These values are serv
 - `ELEVENLABS_API_KEY` — ElevenLabs API key (voice layer)
 - `OPENROUTER_API_KEY` — OpenRouter API key used by the shared `callClaude` LLM entry point
 - `LLM_MODEL` — model slug routed through OpenRouter (default `anthropic/claude-sonnet-4.5`)
-- `PORT` — port the engine listens on (default `3000`)
+- `PORT` — port the engine listens on (default `3000`; use `3100` for the local voice demo)
 
 Do not commit `.env` or any real keys.
+
+The following are **not** part of the server `.env` — they are read at build/deploy time:
+
+- `VITE_AGENT_ID_REALISTIC` — deployed ElevenLabs agent id the browser connects to (compiled into the client bundle by Vite; never put secrets in `VITE_*`)
+- `VITE_API_URL` — optional engine origin for the client; leave empty in dev to use the Vite proxy
+- `BACKEND_PUBLIC_URL` — public URL (e.g. ngrok) that ElevenLabs uses to reach the engine's server tools; read by `packages/voice/src/deploy.ts`
 
 ## CI / GitHub Actions
 
@@ -88,6 +144,17 @@ Configure the required repository secrets under **Settings > Secrets and variabl
 - `CONTEXT_DEV_API_KEY`
 - `ELEVENLABS_API_KEY`
 - `OPENROUTER_API_KEY`
+
+> **Note:** CI currently passes `OPENROUTER_API_KEY` as a secret and `LLM_MODEL` as a repository variable. Add both (Settings > Secrets and variables > Actions) or the LLM-dependent steps will fail.
+
+## Pending work
+
+- **Scorer (M4) is a stub.** `POST /session/:id/debrief` returns a `DebriefHandoff` (transcript + events + case pack) but no scoring runs and the web UI does not render a scorecard yet.
+- **Voice platform-risk spike not run.** The checks in the section below are still blank; run them before relying on native silence handling or live transcript events.
+- **No mode selection in the UI.** Both `guided` and `realistic` agents are deployed, but the web app only wires up `VITE_AGENT_ID_REALISTIC`; guided mode is reachable only by using its agent id directly.
+- **Exhibit screen is a placeholder.** `InterviewClient` reserves `#exhibit-screen`, but no exhibits are rendered.
+- **ngrok / deploy is manual (M5 glue).** The public URL must be re-deployed to the agents on every tunnel restart; there is no automated hosting/deploy pipeline yet.
+- **Local port defaults are misaligned.** The engine defaults to `PORT=3000` while the Vite proxy defaults to `:3100`; run the engine with `PORT=3100` in dev (as in the voice-demo steps) or set `ENGINE_PORT`/`ENGINE_URL` to match.
 
 ## Platform-risk spike findings
 
