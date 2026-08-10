@@ -20,8 +20,6 @@ services:
     build:
       context: .
       dockerfile: packages/engine/Dockerfile
-    ports:
-      - "3000:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       CONTEXT_DEV_API_KEY: ${CONTEXT_DEV_API_KEY}
@@ -42,7 +40,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:3000
+      ENGINE_URL: http://backend:3000
     depends_on:
       - backend
 

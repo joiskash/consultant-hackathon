@@ -2,7 +2,7 @@
 
 Voice-first case interview practice, built live from today's news.
 
-This repository contains the M0–M5 scaffold for the FreshCase project: a TypeScript monorepo with an Express engine, React web UI, Postgres data store, Docker Compose for local development, and GitHub Actions for CI.
+This repository is a TypeScript monorepo for the FreshCase project: an Express engine with the interview state machine (M2), a news-to-CasePack generator (M1), a React web UI with a voice interview client, a Postgres data store, Docker Compose for local development, and GitHub Actions for CI. The scorer (M4) and voice deploy layer (M3) are still in progress.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ DATABASE_URL=postgresql://... npm run integration
 docker compose up --build
 ```
 
-The backend is exposed on `http://localhost:3000` and the web app on `http://localhost:5173`.
+The web app is exposed on `http://localhost:5173`. Under Docker Compose the backend is not published to the host — the web app proxies `/api` and `/session` requests to the `backend` service internally (see `packages/web/vite.config.ts`).
 
 ## Repository layout
 
@@ -37,11 +37,11 @@ The backend is exposed on `http://localhost:3000` and the web app on `http://loc
 ├── packages/
 │   ├── types/                 # Shared Zod schemas and TS types (M0)
 │   ├── db/                    # Postgres client and migrations
-│   ├── engine/                # Express API and session state machine (M2)
-│   ├── generator/             # Case pack generator stub (M1)
+│   ├── engine/                # Express API and interview state machine (M2)
+│   ├── generator/             # News-to-CasePack generator pipeline (M1)
 │   ├── scorer/                # Scoring/debrief stub (M4)
-│   ├── voice/                 # ElevenLabs agent config stub (M3)
-│   └── web/                   # React + Vite frontend
+│   ├── voice/                 # ElevenLabs agent config, prompts, tools, deploy (M3)
+│   └── web/                   # React + Vite frontend with voice interview client
 ├── .github/workflows/ci.yml   # PR CI: build, test, coverage, Docker
 ├── docker-compose.yml         # Postgres + backend + web
 ├── .env.example               # Secret and config template
@@ -62,10 +62,13 @@ The backend is exposed on `http://localhost:3000` and the web app on `http://loc
 
 Copy `.env.example` to `.env` and fill in the real values. These values are server-side only.
 
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` — Postgres credentials for the Compose `db` service
 - `DATABASE_URL` — Postgres connection string
-- `CONTEXT_DEV_API_KEY` — context.dev API key
-- `ELEVENLABS_API_KEY` — ElevenLabs API key
-- `ANTHROPIC_API_KEY` — Anthropic API key for `callClaude`
+- `CONTEXT_DEV_API_KEY` — context.dev API key (news headlines for the generator)
+- `ELEVENLABS_API_KEY` — ElevenLabs API key (voice layer)
+- `OPENROUTER_API_KEY` — OpenRouter API key used by the shared `callClaude` LLM entry point
+- `LLM_MODEL` — model slug routed through OpenRouter (default `anthropic/claude-sonnet-4.5`)
+- `PORT` — port the engine listens on (default `3000`)
 
 Do not commit `.env` or any real keys.
 
@@ -84,7 +87,7 @@ Configure the required repository secrets under **Settings > Secrets and variabl
 
 - `CONTEXT_DEV_API_KEY`
 - `ELEVENLABS_API_KEY`
-- `ANTHROPIC_API_KEY`
+- `OPENROUTER_API_KEY`
 
 ## Platform-risk spike findings
 
