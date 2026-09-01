@@ -1,14 +1,4 @@
 node_modules/
-dist/
-coverage/
 .env
-.env.local
 *.log
-.DS_Store
-.idea/
-.vscode/
-*.tsbuildinfo
-.docker/
-
-# Tool-specific skill mirror (canonical copy lives in .agents/skills)
-.claude/
+state/
