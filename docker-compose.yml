@@ -1,0 +1,11 @@
+services:
+  watcher:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      STATE_FILE: /data/state.json
+    volumes:
+      - odyssey_state:/data
+volumes:
+  odyssey_state:

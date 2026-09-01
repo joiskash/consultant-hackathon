@@ -1,0 +1,20 @@
+app = "odyssey-watch"
+primary_region = "ewr"   # Newark: closest to the theatre and to AMC's origin
+
+[build]
+
+[env]
+  STATE_FILE = "/data/state.json"
+
+[mounts]
+  source = "odyssey_state"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+# No [http_service]: this is a worker, not a web app, so it must never be
+# scaled to zero — a stopped machine is a missed drop.
+[processes]
+  app = "node src/watch.js"

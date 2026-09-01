@@ -1,0 +1,46 @@
+name: Backup watcher
+
+# Redundant safety net behind the always-on Fly worker. Actions cron has a
+# 5-minute floor and is routinely late, so this is a backstop, not the primary.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: odyssey-watch
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Best-effort dedupe. A cache miss costs a duplicate alert, never a missed one.
+      - name: Restore watcher state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: odyssey-state-${{ github.run_id }}
+          restore-keys: odyssey-state-
+
+      - name: Poll
+        env:
+          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATE_FILE: state/state.json
+        run: npm run once
+
+      - name: Save watcher state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: odyssey-state-${{ github.run_id }}
