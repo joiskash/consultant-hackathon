@@ -54,7 +54,12 @@ export class AmcClient {
       // 401/403/404 are decisions, not blips: retrying cannot change them.
       if (res.status === 404) throw new AmcError('not found', 404);
       if (res.status === 401 || res.status === 403) {
-        throw new AmcError(`vendor key rejected (HTTP ${res.status})`, res.status);
+        // AMC explains the refusal in the body; without it a 403 is unactionable.
+        const detail = await res.text().catch(() => '');
+        throw new AmcError(
+          `vendor key rejected (HTTP ${res.status})${detail ? `: ${detail.slice(0, 300)}` : ''}`,
+          res.status,
+        );
       }
       if (res.status >= 500) {
         lastErr = new AmcError(`server error ${res.status}`, res.status);

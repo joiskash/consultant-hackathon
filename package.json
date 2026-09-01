@@ -11,6 +11,7 @@
     "discover": "node src/discover.js",
     "check": "node src/preflight.js",
     "chatid": "node src/chatid.js",
+    "probe": "node src/probe.js",
     "test": "node --test test/*.test.js"
   }
 }

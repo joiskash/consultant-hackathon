@@ -31,6 +31,14 @@ jobs:
       # Prove the vendor key and Telegram delivery BEFORE touching Fly. Deploying
       # a config that cannot reach AMC just produces a machine that looks healthy
       # and watches nothing.
+      # Runs first and never blocks: if the key is refused, this is the log that
+      # says which endpoints and header forms AMC actually accepts.
+      - name: Probe AMC endpoints
+        continue-on-error: true
+        env:
+          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+        run: npm run probe
+
       - name: Validate config (AMC key + Telegram)
         env:
           AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
