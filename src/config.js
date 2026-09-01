@@ -35,8 +35,8 @@ export function buildConfig() {
     watchStart: process.env.WATCH_START || '2026-09-01',
     watchEnd: process.env.WATCH_END || '2026-09-06',
 
-    pollIntervalMs: num(process.env.POLL_INTERVAL_MS, 60_000),
-    fastPollIntervalMs: num(process.env.FAST_POLL_INTERVAL_MS, 15_000),
+    pollIntervalMs: num(process.env.POLL_INTERVAL_MS, 120_000),
+    fastPollIntervalMs: num(process.env.FAST_POLL_INTERVAL_MS, 30_000),
     fastPollWindowMs: num(process.env.FAST_POLL_WINDOW_MS, 600_000),
     heartbeatMs: num(process.env.HEARTBEAT_MS, 21_600_000),
     failureAlertThreshold: num(process.env.FAILURE_ALERT_THRESHOLD, 5),

@@ -2,12 +2,11 @@ name: Backup watcher
 
 # Redundant safety net behind the always-on Fly worker. Actions cron has a
 # 5-minute floor and is routinely late, so this is a backstop, not the primary.
-# The 5-minute schedule is DISABLED. With no working data source it only
-# hammers AMC, which is what got the runner IPs Cloudflare-blocked. Re-enable
-# the cron line once a valid vendor key is in place.
+# Backstop behind the always-on Fly worker. Every run costs 6 Parse.bot calls
+# (one per date), so this is deliberately every 15 minutes rather than every 5.
 on:
-  # schedule:
-  #   - cron: '*/5 * * * *'
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -38,9 +37,9 @@ jobs:
       - name: Skip if secrets are not configured
         id: guard
         env:
-          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+          PARSE_BOT: ${{ secrets.PARSE_BOT }}
         run: |
-          if [ -z "$AMC_VENDOR_KEY" ]; then
+          if [ -z "$PARSE_BOT" ]; then
             echo "secrets not configured yet; skipping"
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
@@ -50,7 +49,8 @@ jobs:
       - name: Poll
         if: steps.guard.outputs.ready == 'true'
         env:
-          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+          PARSE_BOT: ${{ secrets.PARSE_BOT }}
+          PARSEBOT_SCRAPER_ID: ${{ vars.PARSEBOT_SCRAPER_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           STATE_FILE: state/state.json

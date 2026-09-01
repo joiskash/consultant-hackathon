@@ -5,6 +5,25 @@ Alerts you on Telegram the moment IMAX 70mm tickets for *The Odyssey* open up at
 
 Zero runtime dependencies (Node 20+ built-in `fetch` only).
 
+## Data source
+
+Uses the **Parse.bot** AMC API (`SOURCE=parsebot`, the default). Verified live:
+23 of 351 showtimes in the window are Odyssey in `IMAX 70MM`, and the matcher
+correctly ignores plain `70mm`, `Laser at AMC`, and `Open Caption` showings.
+
+The official AMC API path is still in the tree (`SOURCE=amc`) but that vendor key
+returns `Unauthorized VendorKey` (code 12005) on every endpoint. Direct scraping
+of amctheatres.com is not viable either: repeated requests from datacenter IPs
+get Cloudflare-blocked. Parse.bot avoids both problems by fetching from its own
+infrastructure.
+
+### Cost
+
+Each poll costs **one Parse.bot call per date** — 6 calls per cycle. At the
+default 120s cadence that is ~4,300 calls/day, plus ~600/day from the 15-minute
+Actions backstop. Raise `POLL_INTERVAL_MS` if your plan is metered tighter than
+that.
+
 ---
 
 ## What counts as "tickets opening up"

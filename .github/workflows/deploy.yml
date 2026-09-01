@@ -33,11 +33,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # AMC's Cloudflare blocks datacenter IPs that poll repeatedly, so this
-      # never runs automatically — only when explicitly requested.
-      - name: Validate config (AMC key + Telegram)
-        if: inputs.validate_amc
+      # Safe to run on every deploy: Parse.bot fetches from its own
+      # infrastructure, so this never touches AMC directly.
+      - name: Validate config (source + Telegram)
         env:
+          PARSE_BOT: ${{ secrets.PARSE_BOT }}
+          PARSEBOT_SCRAPER_ID: ${{ vars.PARSEBOT_SCRAPER_ID }}
           AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -64,7 +65,7 @@ jobs:
       - name: Push secrets to Fly
         run: |
           flyctl secrets set -a "$FLY_APP" --stage \
-            AMC_VENDOR_KEY="${{ secrets.AMC_VENDOR_KEY }}" \
+            PARSE_BOT="${{ secrets.PARSE_BOT }}" \
             TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}" \
             TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
 
