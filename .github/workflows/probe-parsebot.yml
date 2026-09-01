@@ -1,0 +1,29 @@
+name: Probe Parse.bot API
+
+# Runs when the probe script changes, and on demand. Parse.bot fetches from its
+# own infrastructure, so this does not touch AMC directly and cannot contribute
+# to the edge block on our IPs.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/probe-parsebot.js']
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Probe
+        env:
+          PARSEBOT_API_KEY: ${{ secrets.PARSEBOT_API_KEY }}
+          PARSEBOT_SCRAPER_ID: ${{ vars.PARSEBOT_SCRAPER_ID }}
+        run: |
+          if [ -z "$PARSEBOT_API_KEY" ]; then
+            echo "PARSEBOT_API_KEY secret is not set — add it in Settings → Secrets → Actions"; exit 1
+          fi
+          npm run probe:parsebot

@@ -15,6 +15,7 @@
     "probe:public": "node src/probe-public.js",
     "probe:structure": "node src/probe-structure.js",
     "probe:filter": "node src/probe-filter.js",
+    "probe:parsebot": "node src/probe-parsebot.js",
     "test": "node --test test/*.test.js"
   }
 }
