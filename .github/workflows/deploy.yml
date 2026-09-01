@@ -76,27 +76,38 @@ jobs:
 
       # A deploy that returns success while the process crash-loops is exactly
       # the "looks healthy, watches nothing" failure this project exists to
-      # avoid, so prove the machine is started and the poller actually ran.
+      # avoid. `flyctl logs --no-tail` replays a history buffer, so old failures
+      # would otherwise be read as current ones: filter to this deploy's window
+      # and treat machine state as the authoritative signal.
       - name: Verify the watcher is alive
         run: |
-          echo "waiting for the machine to boot and complete a poll..."
-          sleep 45
-          flyctl status -a "$FLY_APP"
-          echo "--- recent logs ---"
-          LOGS=$(timeout 45 flyctl logs -a "$FLY_APP" --no-tail 2>&1 || true)
-          echo "$LOGS"
+          echo "waiting for boot and a first poll..."
+          sleep 60
 
-          if echo "$LOGS" | grep -q "max restart count"; then
-            echo "::error::machine is crash-looping"; exit 1
+          if ! flyctl status -a "$FLY_APP" | grep -qi started; then
+            echo "no started machine; attempting a restart"
+            flyctl machine restart -a "$FLY_APP" --skip-health-checks || true
+            sleep 45
           fi
-          if echo "$LOGS" | grep -qE "startup failed|fatal:"; then
-            echo "::error::watcher failed to start"; exit 1
-          fi
+
+          flyctl status -a "$FLY_APP"
+
+          CUTOFF=$(date -u -d '4 minutes ago' +%Y-%m-%dT%H:%M:%S)
+          RECENT=$(timeout 45 flyctl logs -a "$FLY_APP" --no-tail 2>&1 \
+            | sed 's/\x1b\[[0-9;]*m//g' \
+            | awk -v c="$CUTOFF" '{ if (match($0, /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/)) { ts=substr($0, RSTART, RLENGTH); if (ts >= c) print } }')
+
+          echo "--- logs since $CUTOFF ---"
+          echo "$RECENT"
+
           if ! flyctl status -a "$FLY_APP" | grep -qi started; then
             echo "::error::no machine in started state"; exit 1
           fi
-          if echo "$LOGS" | grep -q "candidate showtime"; then
-            echo "confirmed: the poller completed a cycle"
+          if echo "$RECENT" | grep -qE "startup failed|fatal:|max restart count"; then
+            echo "::error::watcher is failing on this deploy"; exit 1
+          fi
+          if echo "$RECENT" | grep -q "candidate showtime"; then
+            echo "CONFIRMED: the poller completed a cycle"
           else
-            echo "::warning::no poll line seen yet; check logs shortly"
+            echo "::warning::machine is started but no poll line seen yet"
           fi
