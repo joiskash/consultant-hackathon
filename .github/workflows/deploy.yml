@@ -84,11 +84,18 @@ jobs:
           echo "waiting for boot and a first poll..."
           sleep 60
 
-          if ! flyctl status -a "$FLY_APP" | grep -qi started; then
-            echo "no started machine; attempting a restart"
-            flyctl machine restart -a "$FLY_APP" --skip-health-checks || true
-            sleep 45
-          fi
+          # A machine that exhausted Fly's restart budget stays stopped, and a
+          # later deploy updates its image without starting it. Start any
+          # machine that is not running, by id — the bare command needs a TTY.
+          IDS=$(flyctl machines list -a "$FLY_APP" --json | jq -r '.[].id')
+          for id in $IDS; do
+            STATE=$(flyctl machines list -a "$FLY_APP" --json | jq -r ".[] | select(.id==\"$id\") | .state")
+            if [ "$STATE" != "started" ]; then
+              echo "machine $id is $STATE; starting it"
+              flyctl machine start "$id" -a "$FLY_APP" || true
+            fi
+          done
+          sleep 45
 
           flyctl status -a "$FLY_APP"
 
