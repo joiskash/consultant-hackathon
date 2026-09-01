@@ -33,7 +33,7 @@ A showtime that simply *stays* available never re-alerts, so the bot doesn't cry
 2. Send your new bot any message (it can't message you first).
 3. Get your chat id:
    ```sh
-   curl "https://api.telegram.org/bot<TOKEN>/getUpdates" | grep -o '"id":[0-9-]*' | head -1
+   TELEGRAM_BOT_TOKEN=<token> npm run chatid
    ```
 
 ### 2. Configure
@@ -73,15 +73,18 @@ to a regex that matches what you see.
 ### Fly.io (primary, always-on)
 
 ```sh
-fly launch --no-deploy --name odyssey-watch
-fly volumes create odyssey_state --size 1 --region ewr
-fly secrets set AMC_VENDOR_KEY=... TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
-fly deploy
-fly logs
+flyctl auth login
+./scripts/deploy.sh          # creates app + volume, sets secrets, deploys
+flyctl logs -a odyssey-watch
 ```
 
-Deliberately has no `[http_service]` block, so Fly cannot scale it to zero — a
-stopped machine is a missed drop.
+You should get a Telegram message within ~30 seconds confirming the watcher
+started. If you don't, something is wrong — check the logs.
+
+Two deliberate choices: there is no `[http_service]` block, so Fly cannot scale
+the worker to zero (a stopped machine is a missed drop), and the deploy passes
+`--ha=false`, because Fly's default of two machines would mean two watchers
+double-alerting you and doubling the load on the vendor key.
 
 ### Docker (equivalent, on any always-on machine)
 

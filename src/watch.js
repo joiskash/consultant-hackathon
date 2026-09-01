@@ -100,7 +100,17 @@ async function heartbeat() {
 }
 
 async function main() {
-  await bootstrap();
+  try {
+    await bootstrap();
+  } catch (e) {
+    // Startup failures are the easiest kind to miss: the supervisor restarts us
+    // quietly and nothing reaches the phone. Try to say why before dying.
+    log.error(`startup failed: ${e.message}`);
+    await deliver(
+      `<b>🔴 Watcher failed to start</b>\n<code>${e.message}</code>\n\nIt will keep retrying.`,
+    ).catch(() => {});
+    throw e;
+  }
 
   for (;;) {
     try {

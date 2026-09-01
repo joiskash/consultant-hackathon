@@ -10,6 +10,7 @@
     "once": "node src/once.js",
     "discover": "node src/discover.js",
     "check": "node src/preflight.js",
+    "chatid": "node src/chatid.js",
     "test": "node --test test/*.test.js"
   }
 }
