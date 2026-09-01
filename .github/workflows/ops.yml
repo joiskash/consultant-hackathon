@@ -1,0 +1,40 @@
+name: Ops (status / logs / restart)
+
+# Lets you operate the Fly worker from the Actions tab without a terminal.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to do'
+        type: choice
+        options: [status, logs, restart, stop]
+        default: status
+
+env:
+  FLY_APP: ${{ vars.FLY_APP || 'odyssey-watch-joiskash' }}
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Status
+        run: flyctl status -a "$FLY_APP"
+
+      - name: Logs
+        if: inputs.action == 'logs' || inputs.action == 'status'
+        run: timeout 45 flyctl logs -a "$FLY_APP" --no-tail || true
+
+      - name: Restart
+        if: inputs.action == 'restart'
+        run: flyctl apps restart "$FLY_APP"
+
+      - name: Stop
+        if: inputs.action == 'stop'
+        run: |
+          flyctl scale count 0 -a "$FLY_APP" --yes
+          echo "Watcher stopped. Re-deploy or scale to 1 to resume."

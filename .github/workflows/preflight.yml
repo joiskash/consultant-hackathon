@@ -1,0 +1,39 @@
+name: Preflight (validate key + discover formats)
+
+# Run this from the Actions tab BEFORE deploying. The runner has network access
+# to AMC and Telegram, so this is where the vendor key actually gets proven.
+on:
+  workflow_dispatch:
+    inputs:
+      run_discover:
+        description: 'Also dump AMC format strings (recommended)'
+        type: boolean
+        default: true
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Preflight checks
+        env:
+          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run check
+
+      - name: Discover AMC format strings
+        if: always() && inputs.run_discover
+        env:
+          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run discover

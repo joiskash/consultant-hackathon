@@ -25,7 +25,52 @@ A showtime that simply *stays* available never re-alerts, so the bot doesn't cry
 
 ---
 
+## Setup entirely from the GitHub UI
+
+No terminal needed. Add four secrets, then run two workflows.
+
+### 1. Add GitHub secrets
+
+**Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | Where it comes from |
+|---|---|
+| `AMC_VENDOR_KEY` | your AMC developer vendor key |
+| `TELEGRAM_BOT_TOKEN` | [@BotFather](https://t.me/BotFather) → `/newbot` |
+| `TELEGRAM_CHAT_ID` | see below |
+| `FLY_API_TOKEN` | fly.io → Account → **Access Tokens** → create |
+
+To get `TELEGRAM_CHAT_ID`: message your bot once in Telegram, then open
+`https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and copy
+`result[0].message.chat.id`. (Locally: `TELEGRAM_BOT_TOKEN=... npm run chatid`.)
+
+### 2. Run **Preflight** (Actions tab → Preflight → Run workflow)
+
+This is where the vendor key is actually proven. It validates the key, resolves
+the theatre id, probes the date format, checks embargoed-feed access, sends a
+test Telegram message, and dumps every format string AMC returns for Odyssey.
+
+**Read the `discover` output.** If no showtime matched the IMAX 70mm filter but
+a 70mm format appears in the dump, add a repository **variable** `FORMAT_PATTERN`
+with a regex matching what you see. A too-narrow matcher fails silently.
+
+### 3. Run **Deploy to Fly.io** (Actions tab → Deploy → Run workflow)
+
+Creates the app and state volume if missing, pushes the secrets to Fly, and
+deploys a single machine. You should get a Telegram "watcher started" message
+within ~30 seconds.
+
+Optionally set repository variables `FLY_APP` (default `odyssey-watch-joiskash`)
+and `FLY_REGION` (default `ewr`).
+
+### 4. Operate it — **Ops** workflow
+
+Status, logs, restart, or stop, all from the Actions tab.
+
+---
+
 ## Setup
+
 
 ### 1. Telegram credentials
 
@@ -94,9 +139,9 @@ docker compose up -d --build && docker compose logs -f
 
 ### GitHub Actions (backup)
 
-Already wired in `.github/workflows/watch.yml`, running every 5 minutes. Add
-three repo secrets under **Settings → Secrets and variables → Actions**:
-`AMC_VENDOR_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+Already wired in `.github/workflows/watch.yml`, running every 5 minutes off the
+same three secrets. It skips quietly until they are configured, so it will not
+bury you in failed runs before setup.
 
 Actions cron has a 5-minute floor, frequently runs 10–20 minutes late, and can
 skip runs under load — so treat it strictly as a backstop behind Fly. Its alerts

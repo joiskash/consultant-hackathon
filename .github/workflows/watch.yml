@@ -30,7 +30,22 @@ jobs:
           key: odyssey-state-${{ github.run_id }}
           restore-keys: odyssey-state-
 
+      # Before the secrets exist this job would fail every 5 minutes and bury
+      # you in red X's and notification mail. Skip quietly instead.
+      - name: Skip if secrets are not configured
+        id: guard
+        env:
+          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
+        run: |
+          if [ -z "$AMC_VENDOR_KEY" ]; then
+            echo "secrets not configured yet; skipping"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Poll
+        if: steps.guard.outputs.ready == 'true'
         env:
           AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
