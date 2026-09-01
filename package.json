@@ -14,6 +14,7 @@
     "probe": "node src/probe.js",
     "probe:public": "node src/probe-public.js",
     "probe:structure": "node src/probe-structure.js",
+    "probe:filter": "node src/probe-filter.js",
     "test": "node --test test/*.test.js"
   }
 }

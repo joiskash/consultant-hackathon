@@ -41,7 +41,7 @@ jobs:
 
       - name: Probe public page structure
         continue-on-error: true
-        run: npm run probe:structure
+        run: npm run probe:filter
 
       - name: Validate config (AMC key + Telegram)
         env:
