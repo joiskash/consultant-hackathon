@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['src/probe-parsebot.js']
+    paths: ['src/probe-parsebot.js', '.github/workflows/probe-parsebot.yml']
 
 jobs:
   probe:
@@ -20,10 +20,10 @@ jobs:
           node-version: '20'
       - name: Probe
         env:
-          PARSEBOT_API_KEY: ${{ secrets.PARSEBOT_API_KEY }}
+          PARSEBOT_API_KEY: ${{ secrets.PARSE_BOT || secrets.PARSEBOT_API_KEY }}
           PARSEBOT_SCRAPER_ID: ${{ vars.PARSEBOT_SCRAPER_ID }}
         run: |
           if [ -z "$PARSEBOT_API_KEY" ]; then
-            echo "PARSEBOT_API_KEY secret is not set — add it in Settings → Secrets → Actions"; exit 1
+            echo "No Parse.bot key found. Add a repository secret named PARSE_BOT (or PARSEBOT_API_KEY)."; exit 1
           fi
           npm run probe:parsebot

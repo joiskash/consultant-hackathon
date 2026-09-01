@@ -6,9 +6,9 @@
  * API answers a missing-parameter error that names what it wants.
  * Never prints the key.
  */
-const key = process.env.PARSEBOT_API_KEY;
+const key = process.env.PARSEBOT_API_KEY || process.env.PARSE_BOT;
 const scraperId = process.env.PARSEBOT_SCRAPER_ID || '806399d8-6960-4d3e-9ea0-da32b3129d63';
-if (!key) { console.error('PARSEBOT_API_KEY not set'); process.exit(1); }
+if (!key) { console.error('No Parse.bot key (set PARSE_BOT or PARSEBOT_API_KEY)'); process.exit(1); }
 console.log(`key prefix=${key.slice(0, 4)}… len=${key.length}  scraper=${scraperId}\n`);
 
 const BASE = 'https://api.parse.bot';
