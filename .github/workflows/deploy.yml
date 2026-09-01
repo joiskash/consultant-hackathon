@@ -2,6 +2,11 @@ name: Deploy to Fly.io
 
 on:
   workflow_dispatch:
+    inputs:
+      validate_amc:
+        description: 'Contact AMC to validate the key before deploying'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ['src/**', 'Dockerfile', 'fly.toml', 'package.json', '.github/workflows/deploy.yml']
@@ -28,37 +33,15 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # Prove the vendor key and Telegram delivery BEFORE touching Fly. Deploying
-      # a config that cannot reach AMC just produces a machine that looks healthy
-      # and watches nothing.
-      # Runs first and never blocks: if the key is refused, this is the log that
-      # says which endpoints and header forms AMC actually accepts.
-      - name: Probe AMC endpoints
-        continue-on-error: true
-        env:
-          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
-        run: npm run probe
-
-      - name: Probe public page structure
-        continue-on-error: true
-        run: npm run probe:filter
-
+      # AMC's Cloudflare blocks datacenter IPs that poll repeatedly, so this
+      # never runs automatically — only when explicitly requested.
       - name: Validate config (AMC key + Telegram)
+        if: inputs.validate_amc
         env:
           AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: npm run check
-
-      - name: Discover AMC format strings
-        if: always()
-        continue-on-error: true
-        env:
-          AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          FORMAT_PATTERN: ${{ vars.FORMAT_PATTERN }}
-        run: npm run discover
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 

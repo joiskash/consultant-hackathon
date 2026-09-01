@@ -2,9 +2,12 @@ name: Backup watcher
 
 # Redundant safety net behind the always-on Fly worker. Actions cron has a
 # 5-minute floor and is routinely late, so this is a backstop, not the primary.
+# The 5-minute schedule is DISABLED. With no working data source it only
+# hammers AMC, which is what got the runner IPs Cloudflare-blocked. Re-enable
+# the cron line once a valid vendor key is in place.
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  # schedule:
+  #   - cron: '*/5 * * * *'
   workflow_dispatch:
 
 concurrency:

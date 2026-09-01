@@ -18,11 +18,18 @@ export class AmcClient {
     this.fetch = fetchImpl;
     this.maxRetries = maxRetries;
     this.dateFormat = null; // resolved lazily; see resolveDateFormat()
+    this.lastRequestAt = 0;
+    this.minRequestGapMs = Number(process.env.MIN_REQUEST_GAP_MS ?? 1200);
   }
 
   async get(path) {
     const url = path.startsWith('http') ? path : `${BASE}${path}`;
     let lastErr;
+
+    // Never issue requests faster than the floor, whatever the caller does.
+    const since = Date.now() - this.lastRequestAt;
+    if (since < this.minRequestGapMs) await sleep(this.minRequestGapMs - since);
+    this.lastRequestAt = Date.now();
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       if (attempt > 0) {
@@ -56,6 +63,17 @@ export class AmcClient {
       if (res.status === 401 || res.status === 403) {
         // AMC explains the refusal in the body; without it a 403 is unactionable.
         const detail = await res.text().catch(() => '');
+        // A 403 carrying an HTML page is Cloudflare blocking the caller's IP,
+        // not a verdict on the key. Conflating the two sends you off fixing
+        // the wrong thing, so name it explicitly and back off hard.
+        if (/^\s*<|cloudflare|<!DOCTYPE/i.test(detail)) {
+          const e = new AmcError(
+            `blocked by AMC's edge (HTTP ${res.status}, HTML body) — the caller's IP is rate-limited, not necessarily the key`,
+            res.status,
+          );
+          e.blocked = true;
+          throw e;
+        }
         throw new AmcError(
           `vendor key rejected (HTTP ${res.status})${detail ? `: ${detail.slice(0, 300)}` : ''}`,
           res.status,
