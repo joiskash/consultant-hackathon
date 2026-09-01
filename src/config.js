@@ -22,6 +22,9 @@ export function buildConfig() {
   loadDotEnv();
 
   const cfg = {
+    source: (process.env.SOURCE || 'parsebot').toLowerCase(),
+    parseBotKey: process.env.PARSE_BOT || process.env.PARSEBOT_API_KEY,
+    parseBotScraperId: process.env.PARSEBOT_SCRAPER_ID || '52c31c90-81d2-412e-ab12-c18bfddf9da8',
     amcKey: process.env.AMC_VENDOR_KEY,
     telegramToken: process.env.TELEGRAM_BOT_TOKEN,
     telegramChatId: process.env.TELEGRAM_CHAT_ID,
@@ -42,9 +45,9 @@ export function buildConfig() {
   };
 
   const names = {
-    amcKey: 'AMC_VENDOR_KEY',
     telegramToken: 'TELEGRAM_BOT_TOKEN',
     telegramChatId: 'TELEGRAM_CHAT_ID',
+    ...(cfg.source === 'amc' ? { amcKey: 'AMC_VENDOR_KEY' } : { parseBotKey: 'PARSE_BOT' }),
   };
   const missing = Object.keys(names).filter((k) => !cfg[k]);
   if (missing.length) {

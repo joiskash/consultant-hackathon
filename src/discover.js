@@ -3,11 +3,11 @@
  * so the IMAX 70mm matcher is pinned against real data instead of a guess.
  */
 import { buildConfig, datesInWindow } from './config.js';
-import { AmcClient } from './amc.js';
+import { createSource } from './source.js';
 import { formatHaystack, isTargetMovie, isImax70 } from './match.js';
 
 const cfg = buildConfig();
-const amc = new AmcClient(cfg.amcKey);
+const amc = createSource(cfg);
 
 const theatreId = cfg.theatreId ?? (await amc.findTheatreId(cfg.theatreSlug));
 await amc.resolveDateFormat(theatreId, cfg.watchStart);

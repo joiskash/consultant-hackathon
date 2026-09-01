@@ -1,6 +1,6 @@
 /** Two-minute sanity check to run before trusting the watcher. */
 import { buildConfig, datesInWindow } from './config.js';
-import { AmcClient } from './amc.js';
+import { createSource } from './source.js';
 import { Telegram } from './telegram.js';
 
 const cfg = buildConfig();
@@ -17,8 +17,8 @@ try {
   ok(`bot @${await tg.verify()} reachable`);
 } catch (e) { bad(`getMe: ${e.message}`); }
 
-console.log('\n3. AMC vendor key');
-const amc = new AmcClient(cfg.amcKey);
+console.log(`\n3. Data source (${cfg.source})`);
+const amc = createSource(cfg);
 let theatreId = null;
 try {
   theatreId = cfg.theatreId ?? (await amc.findTheatreId(cfg.theatreSlug));

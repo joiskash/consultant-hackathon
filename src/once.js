@@ -7,14 +7,14 @@
  * misses, you get a duplicate alert — which is strictly better than a missed one.
  */
 import { buildConfig } from './config.js';
-import { AmcClient } from './amc.js';
+import { createSource } from './source.js';
 import { Telegram, renderEvent, URGENT } from './telegram.js';
 import { loadState, saveState } from './state.js';
 import { pollOnce } from './poll.js';
 import { log } from './log.js';
 
 const cfg = buildConfig();
-const amc = new AmcClient(cfg.amcKey);
+const amc = createSource(cfg);
 const tg = new Telegram(cfg.telegramToken, cfg.telegramChatId);
 const state = loadState(cfg.stateFile);
 

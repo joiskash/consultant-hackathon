@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['src/probe-parsebot.js', '.github/workflows/probe-parsebot.yml']
+    paths: ['src/probe-parsebot.js', 'src/parsebot.js', 'src/discover.js', '.github/workflows/probe-parsebot.yml']
 
 jobs:
   probe:
@@ -27,3 +27,12 @@ jobs:
             echo "No Parse.bot key found. Add a repository secret named PARSE_BOT (or PARSEBOT_API_KEY)."; exit 1
           fi
           npm run probe:parsebot
+
+      - name: Discover Odyssey formats across the watch window
+        if: always()
+        env:
+          PARSE_BOT: ${{ secrets.PARSE_BOT }}
+          PARSEBOT_SCRAPER_ID: ${{ vars.PARSEBOT_SCRAPER_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run discover
