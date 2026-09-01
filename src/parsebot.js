@@ -28,12 +28,33 @@ export function purchaseUrlFor(encoded) {
  * Flatten Parse.bot's movie -> showtime_groups -> showtimes nesting into the
  * flat shape the matcher and differ already speak, so the source is swappable.
  */
+/**
+ * Classify AMC's availability wording.
+ *
+ * Deliberately defaults to buyable: an unrecognised label costs one spurious
+ * alert, whereas treating it as sold out loses the ticket silently. Only
+ * explicit unavailability counts as sold out, and "almost sold out" is the
+ * opposite of sold out — seats remain.
+ */
+export function classifyAvailability(raw) {
+  const a = String(raw ?? '').trim().toLowerCase();
+  if (!a) return { soldOut: false, almost: false, canceled: false, unknown: true };
+  if (/cancel/.test(a)) return { soldOut: true, almost: false, canceled: true, unknown: false };
+  if (/almost|few\b|limited|last\s|hurry/.test(a)) {
+    return { soldOut: false, almost: true, canceled: false, unknown: false };
+  }
+  if (/sold\s*out|unavailable|not\s+available|no\s+longer|past|expired|closed/.test(a)) {
+    return { soldOut: true, almost: false, canceled: false, unknown: false };
+  }
+  return { soldOut: false, almost: false, canceled: false, unknown: !/available|on\s*sale|buy/.test(a) };
+}
+
 export function normalize(payload, isoDate) {
   const out = [];
   for (const movie of payload?.data?.movies ?? []) {
     for (const group of movie.showtime_groups ?? []) {
       for (const st of group.showtimes ?? []) {
-        const available = /available/i.test(st.availability ?? '');
+        const avail = classifyAvailability(st.availability);
         out.push({
           id: st.showtime_id,
           movieName: movie.title,
@@ -44,8 +65,10 @@ export function normalize(payload, isoDate) {
             ...(group.amenities ?? []).map((a) => ({ code: a, name: a })),
             ...(group.language ? [{ code: group.language, name: group.language }] : []),
           ],
-          isSoldOut: !available,
-          isCanceled: /cancel/i.test(st.availability ?? ''),
+          isSoldOut: avail.soldOut,
+          isAlmostSoldOut: avail.almost,
+          isCanceled: avail.canceled,
+          availabilityUnknown: avail.unknown,
           rawAvailability: st.availability ?? null,
           showDateTimeLocal: `${isoDate}T${to24h(st.time)}`,
           displayTime: `${st.date ?? isoDate} ${st.time ?? ''}`.trim(),

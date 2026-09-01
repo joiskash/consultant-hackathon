@@ -33,6 +33,11 @@ export async function pollOnce(amc, cfg, state) {
     }
   }
 
+  const unknown = Object.values(curr).filter((f) => f.availabilityUnknown);
+  if (unknown.length) {
+    log.warn(`${unknown.length} showtime(s) had unrecognised availability wording; treated as buyable`);
+  }
+
   const events = diffShowtimes(state.showtimes ?? {}, curr);
   log.info(
     `poll: ${Object.keys(curr).length} candidate showtime(s), ${events.length} event(s)` +

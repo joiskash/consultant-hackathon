@@ -16,6 +16,7 @@ const seenFormats = new Set();
 const seenAttrs = new Set();
 const seenAuditoriums = new Set();
 const seenMovies = new Set();
+const seenAvailability = new Set();
 let matched = 0;
 let total = 0;
 
@@ -27,18 +28,22 @@ for (const date of datesInWindow(cfg.watchStart, cfg.watchEnd)) {
   for (const st of [...live, ...emb]) {
     total++;
     seenMovies.add(st.movieName);
+    if (st.rawAvailability) seenAvailability.add(st.rawAvailability);
     if (!isTargetMovie(st, cfg.movieQuery)) continue;
     if (st.premiumFormat) seenFormats.add(st.premiumFormat);
     if (st.auditorium) seenAuditoriums.add(String(st.auditorium));
     for (const a of st.attributes ?? []) seenAttrs.add(`${a?.code} = ${a?.name}`);
     if (isImax70(st)) {
       matched++;
-      console.log(`  MATCH ${st.showDateTimeLocal}  [${formatHaystack(st)}]  soldOut=${st.isSoldOut}`);
+      console.log(`  MATCH ${st.showDateTimeLocal}  availability="${st.rawAvailability}"  soldOut=${st.isSoldOut}${st.isAlmostSoldOut ? ' ALMOST' : ''}${st.availabilityUnknown ? '  ⚠️ UNKNOWN WORDING' : ''}  buy=${st.purchaseUrl ?? 'none'}`);
     } else {
       console.log(`  skip  ${st.showDateTimeLocal}  [${formatHaystack(st)}]`);
     }
   }
 }
+
+console.log('\n=== every availability value seen (all movies) ===');
+for (const a of [...seenAvailability].sort()) console.log(' -', a);
 
 console.log('\n=== all movies at this theatre in window ===');
 for (const m of [...seenMovies].sort()) console.log(' -', m);

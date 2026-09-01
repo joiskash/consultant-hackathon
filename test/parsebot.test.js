@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalize, decodeShowtimeId, purchaseUrlFor } from '../src/parsebot.js';
+import { normalize, decodeShowtimeId, purchaseUrlFor, classifyAvailability } from '../src/parsebot.js';
 import { isCandidate, isBuyable } from '../src/match.js';
 import { fingerprint, diffShowtimes } from '../src/state.js';
 
@@ -98,4 +98,51 @@ test('an empty or malformed payload yields nothing rather than throwing', () => 
   assert.deepEqual(normalize({}, '2026-09-03'), []);
   assert.deepEqual(normalize({ data: { movies: [] } }, '2026-09-03'), []);
   assert.deepEqual(normalize({ data: { movies: [{ title: 'X' }] } }, '2026-09-03'), []);
+});
+
+test('availability wording other than "Available" still counts as buyable', () => {
+  // The original bug: only the literal word "available" marked a showtime
+  // buyable, so every other label AMC uses was silently treated as sold out.
+  for (const label of ['Almost Sold Out', 'Few Tickets Left', 'Limited Seating',
+                       'On Sale', 'Buy Tickets', 'Available']) {
+    assert.equal(classifyAvailability(label).soldOut, false, `"${label}" must not read as sold out`);
+  }
+});
+
+test('only explicit unavailability counts as sold out', () => {
+  for (const label of ['Sold Out', 'SOLD OUT', 'Unavailable', 'Not Available', 'Past']) {
+    assert.equal(classifyAvailability(label).soldOut, true, `"${label}" must read as sold out`);
+  }
+});
+
+test('"Unavailable" is not mistaken for "Available"', () => {
+  // "Unavailable" contains the substring "available" — the mirror of the bug.
+  assert.equal(classifyAvailability('Unavailable').soldOut, true);
+});
+
+test('"Almost Sold Out" means seats remain, despite containing "sold out"', () => {
+  const c = classifyAvailability('Almost Sold Out');
+  assert.equal(c.soldOut, false);
+  assert.equal(c.almost, true);
+});
+
+test('an unknown label defaults to buyable and is flagged', () => {
+  const c = classifyAvailability('Some Wording We Have Never Seen');
+  assert.equal(c.soldOut, false, 'unknown must not silently suppress an alert');
+  assert.equal(c.unknown, true, 'and must be flagged so it can be reviewed');
+});
+
+test('a sold-out showtime reopening as "Almost Sold Out" still alerts', () => {
+  const sold = structuredClone(payload);
+  sold.data.movies[1].showtime_groups[0].showtimes[0].availability = 'Sold Out';
+  const prev = Object.fromEntries(
+    normalize(sold, '2026-09-03').filter((s) => isCandidate(s, 'odyssey')).map((s) => [s.id, fingerprint(s)]));
+
+  const reopened = structuredClone(payload);
+  reopened.data.movies[1].showtime_groups[0].showtimes[0].availability = 'Almost Sold Out';
+  const curr = Object.fromEntries(
+    normalize(reopened, '2026-09-03').filter((s) => isCandidate(s, 'odyssey')).map((s) => [s.id, fingerprint(s)]));
+
+  assert.ok(diffShowtimes(prev, curr).some((e) => e.kind === 'BACK_IN_STOCK'),
+    'scarce-seat wording must still fire the alert');
 });

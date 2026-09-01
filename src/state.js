@@ -25,6 +25,8 @@ export function fingerprint(st, { embargoed = false } = {}) {
     embargoed,
     soldOut: Boolean(st.isSoldOut),
     almostSoldOut: Boolean(st.isAlmostSoldOut),
+    availabilityUnknown: Boolean(st.availabilityUnknown),
+    rawAvailability: st.rawAvailability ?? null,
     buyable: !embargoed && isBuyable(st),
     movieName: st.movieName ?? null,
     showDateTimeLocal: st.showDateTimeLocal ?? st.showDateTimeUtc ?? null,
