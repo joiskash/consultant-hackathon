@@ -62,6 +62,7 @@ async function bootstrap() {
 }
 
 async function tick() {
+  const firstRun = Object.keys(state.showtimes ?? {}).length === 0;
   const { events, showtimes } = await pollOnce(amc, cfg, state);
 
   const urgent = events.filter((e) => URGENT.has(e.kind));
@@ -72,9 +73,22 @@ async function tick() {
     // Repeat the ones that matter: a single missed buzz is a missed ticket.
     await deliver(renderEvent(e, theatreName), { repeat: 3 });
   }
-  for (const e of quiet) {
-    log.info(`note ${e.kind} ${e.id}`);
-    await deliver(renderEvent(e, theatreName), { silent: true });
+  // On the very first poll every tracked showtime is "new", which would fire
+  // one message per showtime. Collapse that into a single summary; only later
+  // arrivals are worth an individual note.
+  if (firstRun && quiet.length > 1) {
+    const soldOut = quiet.filter((e) => e.showtime.soldOut).length;
+    log.info(`first run: summarising ${quiet.length} tracked showtimes`);
+    await deliver(
+      `<b>👁️ Now watching ${quiet.length} IMAX 70mm showtime(s)</b>\n` +
+        `${soldOut} currently sold out.\n\nYou will be alerted the moment any of them becomes buyable.`,
+      { silent: true },
+    );
+  } else {
+    for (const e of quiet) {
+      log.info(`note ${e.kind} ${e.id}`);
+      await deliver(renderEvent(e, theatreName), { silent: true });
+    }
   }
 
   // Drops arrive in bursts, so tighten the cadence for a while after any change.
