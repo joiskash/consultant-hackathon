@@ -74,9 +74,29 @@ jobs:
       - name: Deploy
         run: flyctl deploy -a "$FLY_APP" --ha=false --remote-only
 
-      - name: Status
-        if: always()
+      # A deploy that returns success while the process crash-loops is exactly
+      # the "looks healthy, watches nothing" failure this project exists to
+      # avoid, so prove the machine is started and the poller actually ran.
+      - name: Verify the watcher is alive
         run: |
-          flyctl status -a "$FLY_APP" || true
+          echo "waiting for the machine to boot and complete a poll..."
+          sleep 45
+          flyctl status -a "$FLY_APP"
           echo "--- recent logs ---"
-          timeout 30 flyctl logs -a "$FLY_APP" --no-tail || true
+          LOGS=$(timeout 45 flyctl logs -a "$FLY_APP" --no-tail 2>&1 || true)
+          echo "$LOGS"
+
+          if echo "$LOGS" | grep -q "max restart count"; then
+            echo "::error::machine is crash-looping"; exit 1
+          fi
+          if echo "$LOGS" | grep -qE "startup failed|fatal:"; then
+            echo "::error::watcher failed to start"; exit 1
+          fi
+          if ! flyctl status -a "$FLY_APP" | grep -qi started; then
+            echo "::error::no machine in started state"; exit 1
+          fi
+          if echo "$LOGS" | grep -q "candidate showtime"; then
+            echo "confirmed: the poller completed a cycle"
+          else
+            echo "::warning::no poll line seen yet; check logs shortly"
+          fi
