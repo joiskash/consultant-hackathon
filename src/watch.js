@@ -146,8 +146,14 @@ async function main() {
 
       // A rejected key never fixes itself. Shout once and keep the process up
       // so the supervisor does not crash-loop against AMC.
-      const fatal = e instanceof AmcError && (e.status === 401 || e.status === 403);
-      if ((fatal || consecutiveFailures >= cfg.failureAlertThreshold) && !failureAlerted) {
+      const fatal =
+        (e instanceof AmcError && (e.status === 401 || e.status === 403)) ||
+        e.quota === true ||
+        e.status === 401 ||
+        e.status === 403;
+      // Two failures is already four-plus minutes blind; do not wait for five.
+      const threshold = Math.min(cfg.failureAlertThreshold, 2);
+      if ((fatal || consecutiveFailures >= threshold) && !failureAlerted) {
         failureAlerted = true;
         await deliver(
           `<b>🔴 Watcher is failing</b>\n${consecutiveFailures} consecutive error(s).\n<code>${e.message}</code>\n\nIt keeps retrying, but check it.`,

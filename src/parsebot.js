@@ -93,7 +93,7 @@ function to24h(time) {
  * swapping the data source needs no change to polling, state, or alerting.
  */
 export class ParseBotSource {
-  constructor(apiKey, { scraperId = DEFAULT_SCRAPER, fetchImpl = fetch, maxRetries = 3 } = {}) {
+  constructor(apiKey, { scraperId = DEFAULT_SCRAPER, fetchImpl = fetch, maxRetries = 2 } = {}) {
     this.apiKey = apiKey;
     this.scraperId = scraperId;
     this.fetch = fetchImpl;
@@ -118,7 +118,9 @@ export class ParseBotSource {
       try {
         res = await this.fetch(url, {
           headers: { 'X-API-Key': this.apiKey, Accept: 'application/json' },
-          signal: AbortSignal.timeout(120_000), // upstream does a live fetch
+          // Long enough for a live upstream scrape, short enough that a hung
+          // call cannot stall the poll loop for minutes at a time.
+          signal: AbortSignal.timeout(Number(process.env.REQUEST_TIMEOUT_MS ?? 30_000)),
         });
       } catch (e) {
         lastErr = new ParseBotError(`network error: ${e.message}`, 0);
@@ -133,6 +135,12 @@ export class ParseBotSource {
         continue;
       }
       // Auth and contract errors are verdicts, not blips.
+      if (res.status === 402) {
+        const detail = await res.text().catch(() => '');
+        const e = new ParseBotError(`Parse.bot quota/billing refused the call: ${detail.slice(0, 200)}`, 402);
+        e.quota = true;
+        throw e;
+      }
       if ([401, 403, 404, 422].includes(res.status)) {
         const detail = await res.text().catch(() => '');
         throw new ParseBotError(`HTTP ${res.status}: ${detail.slice(0, 300)}`, res.status);
