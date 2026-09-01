@@ -13,6 +13,7 @@
     "chatid": "node src/chatid.js",
     "probe": "node src/probe.js",
     "probe:public": "node src/probe-public.js",
+    "probe:structure": "node src/probe-structure.js",
     "test": "node --test test/*.test.js"
   }
 }

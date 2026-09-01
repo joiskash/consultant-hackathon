@@ -39,9 +39,9 @@ jobs:
           AMC_VENDOR_KEY: ${{ secrets.AMC_VENDOR_KEY }}
         run: npm run probe
 
-      - name: Probe keyless public endpoints
+      - name: Probe public page structure
         continue-on-error: true
-        run: npm run probe:public
+        run: npm run probe:structure
 
       - name: Validate config (AMC key + Telegram)
         env:
